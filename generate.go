@@ -67,7 +67,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, w := range result.Warnings {
-		fmt.Fprintf(cmd.ErrOrStderr(), "⚠ %s\n", w)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "⚠ %s\n", w)
 	}
 
 	if dryRun {
@@ -82,10 +82,10 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(genResult.Overwritten) > 0 {
-		fmt.Fprintf(cmd.ErrOrStderr(), "  Overwriting: %s\n", strings.Join(genResult.Overwritten, ", "))
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  Overwriting: %s\n", strings.Join(genResult.Overwritten, ", "))
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), `✓ Generated %d files in %s:
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), `✓ Generated %d files in %s:
   %s
 
   Context: %s (from %s/contexts/%s.md)
@@ -107,15 +107,15 @@ func printDryRun(cmd *cobra.Command, targetDir string, result *composer.Result, 
 		preview = preview[:20]
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Would generate %d files in %s:\n\n", len(generator.MarkdownTargets), targetDir)
-	fmt.Fprintf(cmd.OutOrStdout(), "--- CLAUDE.md (preview) ---\n")
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Would generate %d files in %s:\n\n", len(generator.MarkdownTargets), targetDir)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "--- CLAUDE.md (preview) ---\n")
 	for _, line := range preview {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n", line)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n", line)
 	}
 	if len(lines) > 20 {
-		fmt.Fprintf(cmd.OutOrStdout(), "... (%d more lines)\n", len(lines)-20)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "... (%d more lines)\n", len(lines)-20)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %.1fKB | Files: %s\n",
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %.1fKB | Files: %s\n",
 		float64(result.Size)/1024.0,
 		strings.Join(generator.MarkdownTargets, ", "))
 }

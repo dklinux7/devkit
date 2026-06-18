@@ -8,9 +8,15 @@ import (
 
 func TestSearchNative_Basic(t *testing.T) {
 	m := fs.NewMemFS()
-	m.MkdirAll("/dk", 0755)
-	m.WriteFile("/dk/notes.md", []byte("line one\nretry logic here\nline three"), 0644)
-	m.WriteFile("/dk/other.md", []byte("no match here"), 0644)
+	if err := m.MkdirAll("/dk", 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/notes.md", []byte("line one\nretry logic here\nline three"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/other.md", []byte("no match here"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	matches, err := searchNative(m, "/dk", "retry")
 	if err != nil {
@@ -29,8 +35,12 @@ func TestSearchNative_Basic(t *testing.T) {
 
 func TestSearchNative_CaseInsensitive(t *testing.T) {
 	m := fs.NewMemFS()
-	m.MkdirAll("/dk", 0755)
-	m.WriteFile("/dk/test.md", []byte("Kubernetes cluster\nKUBERNETES pods"), 0644)
+	if err := m.MkdirAll("/dk", 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/test.md", []byte("Kubernetes cluster\nKUBERNETES pods"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	matches, err := searchNative(m, "/dk", "kubernetes")
 	if err != nil {
@@ -43,9 +53,15 @@ func TestSearchNative_CaseInsensitive(t *testing.T) {
 
 func TestSearchNative_Recursive(t *testing.T) {
 	m := fs.NewMemFS()
-	m.MkdirAll("/dk/sub", 0755)
-	m.WriteFile("/dk/top.md", []byte("found here"), 0644)
-	m.WriteFile("/dk/sub/nested.md", []byte("also found here"), 0644)
+	if err := m.MkdirAll("/dk/sub", 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/top.md", []byte("found here"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/sub/nested.md", []byte("also found here"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	matches, err := searchNative(m, "/dk", "found")
 	if err != nil {
@@ -58,8 +74,12 @@ func TestSearchNative_Recursive(t *testing.T) {
 
 func TestSearchNative_NoMatch(t *testing.T) {
 	m := fs.NewMemFS()
-	m.MkdirAll("/dk", 0755)
-	m.WriteFile("/dk/test.md", []byte("nothing relevant"), 0644)
+	if err := m.MkdirAll("/dk", 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/test.md", []byte("nothing relevant"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	matches, err := searchNative(m, "/dk", "xyzzy")
 	if err != nil {

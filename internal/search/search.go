@@ -43,7 +43,7 @@ func searchRipgrep(rgPath string, dataDir string, query string) ([]Match, error)
 			continue
 		}
 		lineNum := 0
-		fmt.Sscanf(parts[1], "%d", &lineNum)
+		_, _ = fmt.Sscanf(parts[1], "%d", &lineNum)
 		matches = append(matches, Match{
 			File: parts[0],
 			Line: lineNum,

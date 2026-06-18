@@ -26,16 +26,16 @@ func runReset(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "WARNING: This will permanently delete %s/ and all its contents.\n", dataDir)
-	fmt.Fprintf(cmd.OutOrStdout(), "This cannot be undone. All identity, context, and findings files will be lost.\n\n")
-	fmt.Fprintf(cmd.OutOrStdout(), "Type 'yes' to confirm: ")
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "WARNING: This will permanently delete %s/ and all its contents.\n", dataDir)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "This cannot be undone. All identity, context, and findings files will be lost.\n\n")
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Type 'yes' to confirm: ")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	answer := strings.TrimSpace(scanner.Text())
 
 	if answer != "yes" {
-		fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
 		return nil
 	}
 

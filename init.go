@@ -56,7 +56,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scaffolding templates: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), `✓ Created %s/
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), `✓ Created %s/
 
 Next steps:
   1. Edit your identity:

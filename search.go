@@ -37,7 +37,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(matches) == 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "No matches for %q in %s\n", query, dataDir)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No matches for %q in %s\n", query, dataDir)
 		return nil
 	}
 
@@ -46,9 +46,9 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if rel == "" {
 			rel = m.File
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%s:%d: %s\n", rel, m.Line, m.Text)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s:%d: %s\n", rel, m.Line, m.Text)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "\n%d matches\n", len(matches))
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\n%d matches\n", len(matches))
 
 	return nil
 }
