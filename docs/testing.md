@@ -212,17 +212,44 @@ If the Go toolchain keeps using it (it does), it will keep being maintained.
 
 ## Current test coverage
 
+29 scenarios across init, generate, search, reset, status, doctor, diff, context, lint, and pipeline tests.
+
 | Scenario | File |
 |---|---|
-| `init` creates scaffold | `init.txtar` |
-| `init` fails when dir exists | `init_already_exists.txtar` |
-| `generate` writes 5 AI config files | `generate.txtar` |
+| `init` creates scaffold in empty dir | `init.txtar` |
+| `init` fails when dir already exists | `init_already_exists.txtar` |
+| `generate` writes 10 AI config files | `generate.txtar` |
 | `generate --dry-run` previews without writing | `generate_dry_run.txtar` |
+| `generate --dry-run --all` returns error | `generate_dry_run_all.txtar` |
 | `generate` warns when overwriting changed files | `generate_overwrite.txtar` |
 | `generate` fails on missing target dir | `generate_missing_dir.txtar` |
 | `generate` fails without prior `init` | `generate_no_init.txtar` |
+| `generate --all` regenerates all tracked paths | `generate_all.txtar` |
+| `generate --quiet` suppresses output on success | `generate_quiet.txtar` |
+| `generate` writes extra_targets from workspace.yaml | `generate_extra_targets.txtar` |
+| `generate` writes `.cursor/rules/devkit-context.mdc` | `generate_mdc.txtar` |
 | `search` finds matches with file:line format | `search.txtar` |
-| `search` with no matches | `search_no_match.txtar` |
+| `search` prints nothing on no matches | `search_no_match.txtar` |
 | `search` is case-insensitive | `search_case_insensitive.txtar` |
-| `reset` with `yes` wipes and re-inits | `reset_yes.txtar` |
-| `reset` with `no` aborts cleanly | `reset_no.txtar` |
+| `reset --hard` with `yes` input deletes and re-initialises | `reset_yes.txtar` |
+| `reset --hard` with `no` input aborts cleanly | `reset_no.txtar` |
+| `reset` (default) preserves existing user files | `reset_nondestructive.txtar` |
+| `status` shows in-sync for freshly generated project | `status.txtar` |
+| `status` errors when no projects tracked | `status_empty.txtar` |
+| `status` shows stale when CLAUDE.md manually modified | `status_stale.txtar` |
+| `doctor` runs without error on fresh project | `doctor_instruct.txtar` |
+| `doctor` shows up-to-date for fresh project | `doctor_stale.txtar` |
+| `diff --check` exits 1 when files would change | `diff_check.txtar` |
+| `diff` shows all-unchanged for in-sync project | `diff_unchanged.txtar` |
+| `context ls` lists contexts with size and date | `context_ls.txtar` |
+| `lint` passes for valid `~/.devkit/` | `lint.txtar` |
+| `lint` exits non-zero for invalid workspace.yaml | `lint_errors.txtar` |
+| init → generate → status → generate --all | `pipeline_full_lifecycle.txtar` |
+
+### Coverage reports
+
+CI uploads a coverage artifact on the ubuntu runner. To generate one locally:
+
+```
+go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out
+```

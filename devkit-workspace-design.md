@@ -1281,11 +1281,9 @@ Incorporating competitive intelligence into the original Milestone 2.5 plan:
 
 ## Next Steps
 
-1. **Post-audit hardening** — fix critical/high issues from engineering audit (see below)
-2. **Finish Milestone 2.5** — `devkit sync`, `.mcp.json` stub generation
-3. **Use daily for a month** — let real friction guide Milestone 3 scope
-4. **Milestone 3** — archive + backup (when findings > 50)
-5. **v2** — `devkit serve` (MCP mode) + `devkit watch` (fsnotify auto-regen)
+1. **Use daily** — Milestones 2.5 and 2.75 are complete. Let real daily use surface friction before building more.
+2. **Milestone 3** — `devkit archive` + `devkit backup` with age encryption (when findings > 50)
+3. **v2** — `devkit serve` (MCP server mode) + `devkit watch` (fsnotify auto-regen)
 
 ---
 
