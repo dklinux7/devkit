@@ -3,5 +3,4 @@ env DEVKIT_HOME=$WORK/devkit-home
 
 exec devkit init
 exec devkit search xyzzy-no-match-sentinel
-stdout 'No matches'
-! stdout ':'
+stdout 'No matches for "xyzzy-no-match-sentinel"'

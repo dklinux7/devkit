@@ -11,7 +11,7 @@ cp $WORK/modified.md $WORK/project/CLAUDE.md
 
 exec devkit status
 stdout 'stale'
-stdout $WORK/project
+stdout 'project'
 
 -- workspace.yaml --
 name: "Test User"

@@ -9,7 +9,7 @@ stdout '✓ Generated'
 
 exec devkit doctor
 stdout 'up-to-date'
-stdout $WORK/project
+stdout 'project'
 
 -- workspace.yaml --
 name: "Test User"

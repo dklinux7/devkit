@@ -21,7 +21,13 @@ jobs:
           cache: true
 
       - name: Test
-        run: go test -coverprofile=coverage.out ./...
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            go test -coverprofile=coverage.out ./...
+          else
+            go test ./...
+          fi
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -32,6 +38,7 @@ jobs:
           retention-days: 7
 
       - name: Build
+        shell: bash
         run: CGO_ENABLED=0 go build .
 
   lint:
@@ -44,7 +51,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84  # v6
+      - uses: golangci/golangci-lint-action@db582008a42febd596419635a5abc9d9815daa9c  # v9.2.1
         with:
           version: v2.12.2
 

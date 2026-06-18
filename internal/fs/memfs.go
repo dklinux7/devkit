@@ -36,9 +36,13 @@ func (m *MemFS) WriteFile(path string, data []byte, perm os.FileMode) error {
 	m.files[path] = append([]byte(nil), data...)
 	m.ModTimes[path] = time.Now()
 	dir := filepath.Dir(path)
-	for dir != "." && dir != "/" {
+	for dir != "." {
+		next := filepath.Dir(dir)
+		if next == dir {
+			break
+		}
 		m.dirs[dir] = true
-		dir = filepath.Dir(dir)
+		dir = next
 	}
 	return nil
 }
@@ -121,9 +125,13 @@ func (m *MemFS) Exists(path string) bool {
 func (m *MemFS) MkdirAll(path string, perm os.FileMode) error {
 	m.dirs[path] = true
 	dir := filepath.Dir(path)
-	for dir != "." && dir != "/" {
+	for dir != "." {
+		next := filepath.Dir(dir)
+		if next == dir {
+			break
+		}
 		m.dirs[dir] = true
-		dir = filepath.Dir(dir)
+		dir = next
 	}
 	return nil
 }
