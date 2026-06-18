@@ -1,0 +1,21 @@
+# status detects when generated files are out of date
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project
+stdout '✓ Generated'
+
+cp $WORK/modified.md $WORK/project/CLAUDE.md
+
+exec devkit status
+stdout 'stale'
+stdout $WORK/project
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work
+
+-- modified.md --
+# Manually edited - now stale

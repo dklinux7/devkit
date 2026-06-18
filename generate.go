@@ -40,6 +40,9 @@ func init() {
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
+	if dryRun && generateAll {
+		return fmt.Errorf("--dry-run and --all cannot be combined")
+	}
 	if !generateAll && len(args) != 1 {
 		return fmt.Errorf("requires exactly 1 argument (target path), or use --all")
 	}

@@ -1,0 +1,12 @@
+# lint reports errors for invalid workspace.yaml
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+cp $WORK/bad-workspace.yaml $WORK/devkit-home/workspace.yaml
+
+! exec devkit lint
+stdout 'error'
+
+-- bad-workspace.yaml --
+name: ""
+active_context: ""
