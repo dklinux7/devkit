@@ -14,13 +14,14 @@ go install github.com/dklinux7/devkit@latest
 devkit init                    # set up ~/.devkit/
 devkit generate ~/my-project   # write AI config files
 devkit search "query"          # search your notes
+devkit reset                   # wipe ~/.devkit/ and re-initialize
 ```
 
 Run `devkit help` for full details.
 
 ## What it does
 
-You maintain markdown files describing how you work. devkit composes them and writes config files that Claude Code, Cursor, Copilot, Windsurf, and OpenCode all understand.
+You maintain markdown files describing how you work. devkit composes them and writes config files that Claude Code, Cursor, Copilot, Windsurf, Gemini CLI, and OpenCode all understand.
 
 One source of truth → every AI tool gets the same context.
 
