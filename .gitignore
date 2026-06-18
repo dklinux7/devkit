@@ -21,3 +21,7 @@ Thumbs.db
 
 # Build
 dist/
+
+# Claude Code worktrees and internal dirs
+.claude/
+.claire/
