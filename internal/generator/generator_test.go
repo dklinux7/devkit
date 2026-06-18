@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -150,6 +151,45 @@ func TestGenerate_MDCTarget(t *testing.T) {
 	}
 	if !strings.Contains(string(data), content) {
 		t.Fatalf("mdc file missing content, got: %s", string(data))
+	}
+}
+
+func TestGenerateNoSliceMutation(t *testing.T) {
+	original := make([]string, len(MarkdownTargets))
+	copy(original, MarkdownTargets)
+
+	fsys := fs.NewMemFS()
+	fsys.MkdirAll("/target", 0755)
+
+	ws := &config.Workspace{
+		Name:          "test",
+		ActiveContext: "work",
+		ExtraTargets:  []string{"extra1.md", "extra2.md"},
+	}
+
+	Generate(fsys, "/target", "test content", ws, "/templates")
+
+	if !reflect.DeepEqual(MarkdownTargets, original) {
+		t.Errorf("Generate mutated MarkdownTargets: got %v, want %v", MarkdownTargets, original)
+	}
+}
+
+func TestGenerateRejectsPathTraversal(t *testing.T) {
+	fsys := fs.NewMemFS()
+	fsys.MkdirAll("/target", 0755)
+
+	ws := &config.Workspace{
+		Name:          "test",
+		ActiveContext: "work",
+		ExtraTargets:  []string{"../../etc/passwd"},
+	}
+
+	_, err := Generate(fsys, "/target", "content", ws, "/templates")
+	if err == nil {
+		t.Fatal("expected error for path traversal in extra_targets, got nil")
+	}
+	if !strings.Contains(err.Error(), "escapes") {
+		t.Errorf("expected 'escapes' in error, got: %v", err)
 	}
 }
 

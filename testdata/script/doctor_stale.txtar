@@ -1,0 +1,16 @@
+# doctor detects stale projects
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project
+stdout '✓ Generated'
+
+exec devkit doctor
+stdout 'up-to-date'
+stdout $WORK/project
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

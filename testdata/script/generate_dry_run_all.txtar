@@ -1,0 +1,14 @@
+# --dry-run and --all cannot be combined
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project
+
+! exec devkit generate --dry-run --all
+stderr 'cannot be combined|--dry-run.*--all|--all.*--dry-run'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

@@ -2,6 +2,7 @@ package fs
 
 import (
 	"testing"
+	"time"
 )
 
 func TestMemFS_ReadWriteFile(t *testing.T) {
@@ -139,4 +140,40 @@ func TestOsFS_Implements_Interface(t *testing.T) {
 
 func TestMemFS_Implements_Interface(t *testing.T) {
 	var _ FS = NewMemFS()
+}
+
+func TestMemFSModTime(t *testing.T) {
+	m := NewMemFS()
+
+	before := time.Now()
+	m.WriteFile("/test.md", []byte("hello"), 0600)
+	after := time.Now()
+
+	info, err := m.Stat("/test.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mt := info.ModTime()
+	if mt.Before(before) || mt.After(after) {
+		t.Errorf("ModTime %v not in range [%v, %v]", mt, before, after)
+	}
+}
+
+func TestMemFSCustomModTime(t *testing.T) {
+	m := NewMemFS()
+
+	m.WriteFile("/test.md", []byte("hello"), 0600)
+
+	past := time.Now().Add(-1 * time.Hour)
+	m.ModTimes["/test.md"] = past
+
+	info, err := m.Stat("/test.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !info.ModTime().Equal(past) {
+		t.Errorf("expected ModTime %v, got %v", past, info.ModTime())
+	}
 }

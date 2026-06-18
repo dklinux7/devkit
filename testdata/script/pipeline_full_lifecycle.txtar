@@ -1,0 +1,25 @@
+# full lifecycle: init → generate → status → generate --all
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project1
+mkdir $WORK/project2
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+
+exec devkit generate $WORK/project1
+stdout '✓ Generated'
+exists $WORK/project1/CLAUDE.md
+
+exec devkit generate $WORK/project2
+stdout '✓ Generated'
+exists $WORK/project2/CLAUDE.md
+
+exec devkit status
+stdout 'in-sync'
+
+exec devkit generate --all
+stdout '✓ Generated'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work
