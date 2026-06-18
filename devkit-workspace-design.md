@@ -3,7 +3,7 @@
 **Status:** ACTIVE — Milestone 2 complete, Milestone 2.5 in progress.
 **Date started:** 2026-06-18
 **Design locked:** 2026-06-18
-**Last updated:** 2026-06-18 (AI tool landscape research, plug-and-play decisions, roadmap expanded)
+**Last updated:** 2026-06-18 (competitive intelligence sweep, steal list, format fixes, roadmap revision)
 **Goal:** Make you + AI maximally productive. Not portable, not generic, not elegant — productive.
 
 ---
@@ -936,6 +936,284 @@ Prompts (reusable templates)       Hooks, automation, scheduled tasks
 | Private data leakage | Generated file header warns "contains private context". |
 | Prompts "first-class" but unused | Demoted to "reference directory". v2 candidate for CLI integration. |
 | findings/analyzed orphaned in v1 | Manual-use-only. No command manages them in v1. |
+
+---
+
+---
+
+## Competitive Intelligence (2026-06-18)
+
+Deep analysis of every known tool in this space. Purpose: steal every good idea, avoid every known failure mode, anticipate every ecosystem threat.
+
+### Tools analyzed
+
+| Tool | Stars | Language | Status |
+|------|-------|----------|--------|
+| Caliber | 1,141 | Python | Active |
+| agentsync | 123 | Python | Active |
+| contextai | 5 | Python | Stale |
+| agentfiles | 0 | Go | Stale |
+| ai-brain | 1 | Shell | Active |
+| LynxPrompt | 41 | Python | Active |
+| danielmiessler/Personal_AI_Infrastructure | 15,987 | Markdown | Active |
+| wshobson/agents | 37,000 | Markdown/Template | Active |
+
+---
+
+### Steal List — Tier 1 (High value, low cost, build within 3 months)
+
+**1. Hash-based sync status (`devkit status`)**
+Stolen from: Caliber's sync detection approach.
+Show 4-state output for each tracked project:
+- `in-sync` — generated files match what would be produced now
+- `source-newer` — identity/context changed since last generate
+- `output-modified` — someone edited generated files manually
+- `conflict` — both changed
+Implementation: store SHA256 of composed content in `~/.devkit/projects.txt` alongside the path. Compare on `devkit status`. No mtime heuristics — hash the content.
+
+**2. `devkit diff <path>`**
+Stolen from: Caliber's diff view.
+Show what would change if you ran generate now. Uses standard `diff` algorithm on current file content vs what would be written. Add `--check` flag that exits 1 if anything would change — plugs into CI to catch "forgot to regenerate" before PR merge.
+
+**3. Content-block preservation (`<!-- devkit:begin -->` / `<!-- devkit:end -->`)**
+Stolen from: wshobson/agents partial-update model.
+Instead of overwriting the entire file, replace only the devkit-managed block. This lets team members add project-specific notes below the devkit block without losing them on regenerate. Implementation: write header block delimited by markers; on next generate, find markers and replace only that span. Fall back to full overwrite if markers missing.
+**Caveat:** adds complexity. Only implement if "someone else edits CLAUDE.md" is a real problem you hit.
+
+**4. `devkit lint` — source file validator**
+Stolen from: LynxPrompt's prompt quality scoring approach.
+Validate `~/.devkit/` files for common problems before they propagate to generated output:
+- Frontmatter syntax errors
+- Files exceeding individual size budgets (e.g., single context > 8KB)
+- Missing required sections in identity files
+- Template variables in identity files that won't be resolved
+- Detects `${VAR}` patterns that might be accidentally left unexpanded
+No LLM required — pure static analysis.
+
+**5. Atomic writes (temp + rename)**
+Stolen from: observed failure mode in agentfiles and contextai.
+Current `WriteFile` is not atomic — a crash mid-write leaves a truncated CLAUDE.md. Fix: write to `<path>.devkit-tmp`, then `os.Rename()`. `Rename` is atomic on POSIX (same filesystem). Protects against partial writes during power loss or signal interrupt.
+
+**6. `--quiet` flag on generate**
+Stolen from: Caliber's `--silent` mode.
+`devkit generate --quiet <path>` prints nothing on success, only errors to stderr. Needed for `devkit generate --all` in cron/CI contexts where output noise is undesirable.
+
+**7. `devkit score` — identity quality rubric**
+Stolen from: LynxPrompt's scoring concept, but deterministic (no LLM).
+Score each identity file 0-100 based on measurable properties: word count, section coverage, specificity signals (has code examples, has named tools, has negative examples in donts.md). Print breakdown. Goal: make "my context is too vague" actionable without needing an AI to tell you.
+Implementation: ~100 lines of Go. Heuristic, not ML.
+
+**8. Non-destructive `devkit reset`**
+Stolen from: every OSS tool that got GitHub issues saying "I accidentally ran reset and lost everything".
+Current reset: `rm -rf ~/.devkit/` + re-init. New behavior:
+- Preserve: `identity/`, `contexts/`, `findings/`, `prompts/`, `lessons/`
+- Wipe and re-scaffold: `workspace.yaml`, `donts.md`, `tools.md`
+- Add `--hard` flag for the current nuke-everything behavior
+This makes reset useful for "reset config files to defaults" instead of "destroy all my work".
+
+---
+
+### Steal List — Tier 2 (High value, higher cost, build within 6 months)
+
+**9. TELOS-structured identity (`identity/telos.md`)**
+Stolen from: danielmiessler/Personal_AI_Infrastructure TELOS model.
+Add a third identity file for professional mission/goals/values. TELOS = Telos (purpose), Epistemics (how you learn/think), Lens (worldview), Operations (how you work), Style (communication preferences). This is distinct from `engineering.md` (how you code) and `ai.md` (how AI should behave) — it's the "who you are professionally" layer that makes AI interactions feel more like working with someone who knows you.
+Scaffold it in `devkit init`. Keep it optional — empty file means it's skipped in composition.
+
+**10. `devkit wizard` — interactive terminal interview**
+Stolen from: Caliber's onboarding flow + LynxPrompt's Q&A scaffolding.
+`devkit wizard` runs an interactive terminal interview that fills in identity files with real answers instead of placeholder text. Questions like "What's your preferred git branching strategy?", "What are your top 3 coding constraints?", "What should AI never do?". Writes answers directly to the right files.
+Why this matters: the biggest OSS failure mode is "works for author, confusing for anyone else." The wizard solves cold-start. If it takes 4 file edits to see value, most users bounce.
+
+**11. `devkit watch <path>` — auto-regenerate**
+Stolen from: Caliber's file watcher concept.
+Watch `~/.devkit/` for changes. On any modification, re-run generate for all tracked projects. Uses `fsnotify` (MIT, 9k★, Go). This eliminates the "forgot to regenerate" problem entirely for power users.
+**Dependency note:** `fsnotify` is MIT and pure Go — passes license check. Add to go.mod only when implementing.
+
+**12. `[agent]` / `[human]` section scoping**
+Stolen from: wshobson/agents section-tagged template system.
+Most underrated idea in the space. Allow identity/context files to tag sections for specific consumers:
+```markdown
+<!-- devkit:for agent -->
+When writing code, always include error handling.
+<!-- devkit:end -->
+
+<!-- devkit:for human -->
+This section is for human reference only, not injected into AI context.
+<!-- devkit:end -->
+```
+Sections without tags are included for all. This lets identity files serve dual purpose: AI context AND human documentation. Implementation: strip `human`-tagged sections during composition.
+
+**13. ISA-structured finding template**
+Stolen from: danielmiessler's research workflow structure.
+Replace `research.tmpl.md` with a 12-section ISA (Issue, Solution, Analysis) template that maps to real engineering work:
+- Issue: what broke / what needs to change
+- Context: system state, constraints, stakeholders
+- Hypotheses: candidate root causes or approaches
+- Experiments: what you tried and what happened
+- Root cause: confirmed explanation
+- Solution: what was actually done
+- Verification: how you confirmed it worked
+- Outcome: PR link, metrics, before/after
+- Lessons: what to carry forward
+- References: links, docs, related tickets
+The current `research.tmpl.md` is too generic to actually drive a debugging session.
+
+**14. `devkit import <file>` — heuristic import**
+Stolen from: observed need when evaluating Caliber and agentfiles.
+Many users have existing `.cursorrules`, `CLAUDE.md`, or Copilot instruction files with real content. `devkit import` heuristically parses these and distributes content to the right `~/.devkit/` files — identity-like content to `identity/engineering.md`, constraint-like content to `donts.md`, context-like content to `contexts/<guessed-name>.md`. Outputs a diff before writing so the user can review. Makes adoption from existing tooling frictionless.
+
+---
+
+### Steal List — Tier 3 (Future / v2, defer until pain demands)
+
+**15. `devkit scan <path>` — infer context from repo**
+Stolen from: agentsync's repository scanning.
+Analyze a project directory and draft a context file: detect languages, frameworks, CI system, dependency managers, test framework. Output as a starting draft in `contexts/<name>.md`. Useful when onboarding to an unfamiliar codebase.
+
+**16. `devkit serve` (MCP mode) — move earlier**
+Originally planned as v2. Based on competitive research and SKILL.md ecosystem momentum, this should move to Milestone 3, not v2. Static files will remain primary for 12-18 months, but the MCP server approach is how Anthropic will eventually want devkit to work. ~200 lines of Go (JSON-RPC 2.0 over stdio).
+
+**17. `devkit backup` with age encryption**
+As designed. Build when findings > 50 or when multi-machine is needed. `filippo.io/age` Go library embeds cleanly.
+
+---
+
+### Format Stability Assessment (as of 2026-06-18)
+
+What devkit currently generates vs. what it should generate:
+
+| Format | Current | Status | Action |
+|--------|---------|--------|--------|
+| `CLAUDE.md` | ✓ generated | Stable — Anthropic standard | None |
+| `AGENTS.md` | ✓ generated | Stable — Linux Foundation standard, 60k+ repos | None |
+| `GEMINI.md` | ✓ generated | Stable — Google official | None |
+| `.cursorrules` | ✓ generated | **DEPRECATED** — Cursor moved to `.cursor/rules/*.mdc` | Add `.cursor/rules/devkit-context.mdc` |
+| `.windsurfrules` | ✓ generated | At risk — Windsurf acquired by Devin (OpenDevin) | Keep for now, monitor |
+| `.github/copilot-instructions.md` | ✓ generated | Stable — GitHub official | None |
+| `opencode.json` | ✗ was `opencode.toml` | **FIXED** — OpenCode uses JSONC not TOML | Fixed in this commit |
+| `.claude/settings.json` | template-ready | Stable | None |
+
+**New formats to add (Milestone 2.5):**
+
+| Format | Tool | Priority |
+|--------|------|----------|
+| `.cursor/rules/devkit-context.mdc` | Cursor | HIGH — `.cursorrules` is deprecated |
+| `.kiro/steering/identity.md` | AWS Kiro | MEDIUM — new AWS AI IDE |
+| `.roorules` | Roo Code (VS Code extension) | MEDIUM — significant user base |
+| `.github/instructions/*.instructions.md` | GitHub Copilot (new format) | LOW — additive, not replacement |
+
+**`.cursor/rules/devkit-context.mdc` format:**
+```markdown
+---
+description: devkit identity and context
+alwaysApply: true
+---
+
+<!-- Generated by devkit. Do not edit. -->
+[content here]
+```
+Keep `.cursorrules` as a compatibility fallback for users on older Cursor versions.
+
+---
+
+### OSS Failure Modes to Avoid
+
+Analysis of why similar tools abandoned/stalled, mapped to devkit's specific exposure:
+
+**Failure 1: "Works for author" — bad first-run experience**
+*Exposure: HIGH.*
+Current state: user must edit 4+ files before first `devkit generate` produces useful output. If the scaffolded files contain only placeholder text, the output is useless, and the user concludes "this doesn't work."
+*Fix:* `devkit wizard` (Tier 2). Short-term: make scaffold templates contain real example content, not TODO placeholders. Every scaffold file should look like a real example that someone would actually use, not a blank form.
+
+**Failure 2: Single-maintainer abandonment**
+*Exposure: LOW.*
+devkit is explicitly a personal tool. There is no community to disappoint. The tool succeeds if it helps one user (you) for 5+ years. No growth ambitions = no growth failure.
+
+**Failure 3: Scope creep / abstraction overload**
+*Exposure: MEDIUM.*
+Caliber added plugin systems, server modes, and team features. Most features are unused by 95% of users. devkit's defense: the "Rejected Ideas" section. Add to it aggressively. When in doubt, reject.
+
+**Failure 4: Dependency rot**
+*Exposure: LOW (actively mitigated).*
+Current deps: cobra, gopkg.in/yaml.v3, testscript. govulncheck + trivy in CI. Dependabot weekly. go-licenses gate. This is already best-in-class for a Go tool of this size.
+
+**Failure 5: Regeneration friction → tool becomes adversary**
+*Exposure: HIGH — the most important failure mode.*
+If running `devkit generate` becomes something users avoid (because it wipes manual edits, is slow, requires remembering to run it), the tool is dead even if it's installed. Three defenses:
+1. Content-block preservation (Tier 1 steal #3) — don't wipe manual additions
+2. `devkit watch` (Tier 2 steal #11) — auto-regenerate, never think about it
+3. `devkit diff --check` (Tier 1 steal #2) — CI catches forgotten regenerations
+**Build at least one of these in Milestone 2.5.**
+
+**Failure 6: Config format churn killing users**
+*Exposure: MEDIUM.*
+`.cursorrules` is already deprecated. Windsurf's future is uncertain. If devkit writes to a format that disappears, generated files become clutter.
+*Fix:* `extra_targets` in workspace.yaml lets users opt out. `devkit doctor` can warn about dead formats. Monitor ecosystem and deprecate stale targets.
+
+**Failure 7: "Too much to fill in" paralysis**
+*Exposure: MEDIUM.*
+If identity files look like a homework assignment, users skip them. The value of devkit is proportional to the quality of identity/context files. If those are empty, devkit is just a file copier.
+*Fix:* wizard (Tier 2). Short-term: scaffold templates should have inline comments explaining what good content looks like, with examples. Not TODOs — examples.
+
+---
+
+### Existential Threats (18-month horizon)
+
+**Threat 1: Anthropic ships native CLAUDE.md management**
+*Probability: LOW-MEDIUM. Impact: MEDIUM.*
+Claude Code already reads CLAUDE.md. If Anthropic builds a UI for editing it and syncing across projects, devkit's generate flow is redundant for Claude-only users. devkit's defense: AGENTS.md + multi-tool support. Anthropic won't build Cursor/Copilot/Windsurf integrations.
+
+**Threat 2: SKILL.md / Agent Skills becomes universal**
+*Probability: HIGH. Impact: HIGH.*
+The SKILL.md ecosystem (skills as markdown in `~/.claude/skills/`) is Anthropic-originated and now adopted by 35+ tools. If every AI tool can reference personal skills from `~/.claude/skills/`, and skills include context/identity sections, devkit's value proposition weakens.
+*Mitigation:* devkit should generate `~/.claude/skills/devkit-context.md` as part of its output. Not a breaking change — additive. Adds devkit's composed content to the skills ecosystem. Timeline: add in Milestone 2.5.
+
+**Threat 3: IDE-native context management**
+*Probability: MEDIUM. Impact: HIGH.*
+JetBrains, VS Code, or Cursor could ship a settings UI for managing AI context. Would make file-based approaches feel old. devkit's defense: it's not IDE-specific. The private `~/.devkit/` data model works regardless of IDE.
+
+**Threat 4: MCP kills static files**
+*Probability: LOW (18-month horizon). Impact: MEDIUM.*
+If AI tools move entirely to live MCP resource queries and stop reading CLAUDE.md, static files become stale. Static files will remain primary for at least 2 years given how many tools are file-based. `devkit serve` is the long-term hedge.
+
+**Threat 5: `.cursorrules` deprecation cascade**
+*Probability: HIGH (already happening). Impact: LOW.*
+Cursor deprecated `.cursorrules`. Windsurf may follow. Each deprecation = one less reason for a new user to install devkit.
+*Mitigation:* add replacement formats as they emerge. `extra_targets` covers long tail. `.cursor/rules/devkit-context.mdc` should be in Milestone 2.5.
+
+---
+
+### Revised Priority Order for Milestone 2.5
+
+Incorporating competitive intelligence into the original Milestone 2.5 plan:
+
+| Priority | Feature | Why |
+|----------|---------|-----|
+| 1 | `opencode.json` fix | **DONE** — was wrong format (TOML vs JSON) |
+| 2 | Atomic writes in generator | Low-cost correctness fix, prevents partial-write corruption |
+| 3 | `extra_targets` in workspace.yaml | Enables new tool support without a release; needed for .mdc, .kiro, .roorules |
+| 4 | `.cursor/rules/devkit-context.mdc` | `.cursorrules` is deprecated NOW — add replacement before new users hit stale docs |
+| 5 | `projects.txt` registry + `--all` | Makes multi-project update a one-liner; required for `devkit status` and `devkit diff` |
+| 6 | `devkit status` | Hash-based sync detection — shows which projects need regeneration |
+| 7 | `devkit diff <path>` + `--check` | CI integration; solve "forgot to regenerate" problem |
+| 8 | Non-destructive `devkit reset` | Safety; one user incident will make you regret this not existing |
+| 9 | `devkit context ls` | Quality of life, small scope |
+| 10 | `devkit doctor` | Stale detection; leverages projects registry |
+| 11 | `identity/telos.md` scaffold | Add to init scaffold; optional but valuable long-term |
+| 12 | `devkit lint` | Pre-generate validation; catches bad frontmatter and oversized files |
+| 13 | `devkit search --interactive` | fzf + go-fuzzyfinder fallback |
+| 14 | `~/.claude/skills/devkit-context.md` output | Hedge against SKILL.md ecosystem threat |
+| 15 | `devkit sync` | git pull/push on ~/.devkit/ — multi-machine |
+
+**Not in Milestone 2.5 (defer to 3 or v2):**
+- `devkit wizard` — high value but high effort; defer until "first-run problem" is confirmed painful
+- `devkit watch` — adds fsnotify dep; build when "forgot to regenerate" is daily pain
+- `devkit serve` (MCP) — still a v2 item; static files dominate for 12-18 months
+- Content-block preservation — defer until "someone edits CLAUDE.md manually" is real problem
+- `devkit import` — nice but edge case; manual file copying is fine
+- `devkit scan` — useful but complex; defer to v2
+- `devkit backup` — build when findings > 50
 
 ---
 

@@ -61,7 +61,7 @@ func TestGenerate_OverwriteReporting(t *testing.T) {
 
 func TestGenerate_StructuredTargets(t *testing.T) {
 	m := fs.NewMemFS()
-	if err := m.WriteFile("/templates/opencode.toml.tmpl", []byte("[context]\ncontent = \"{{.Workspace.Name}}\"\n"), 0644); err != nil {
+	if err := m.WriteFile("/templates/opencode.json.tmpl", []byte("{\"context\": \"{{.Workspace.Name}}\"}\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	ws := &config.Workspace{Name: "Dev", ActiveContext: "work"}
@@ -73,20 +73,20 @@ func TestGenerate_StructuredTargets(t *testing.T) {
 
 	foundOpencode := false
 	for _, name := range r.Written {
-		if name == "opencode.toml" {
+		if name == "opencode.json" {
 			foundOpencode = true
 		}
 	}
 	if !foundOpencode {
-		t.Fatal("opencode.toml should be written when template exists")
+		t.Fatal("opencode.json should be written when template exists")
 	}
 
-	data, err := m.ReadFile("/project/opencode.toml")
+	data, err := m.ReadFile("/project/opencode.json")
 	if err != nil {
-		t.Fatalf("missing opencode.toml: %v", err)
+		t.Fatalf("missing opencode.json: %v", err)
 	}
-	if string(data) != "[context]\ncontent = \"Dev\"\n" {
-		t.Fatalf("opencode.toml content = %q", string(data))
+	if string(data) != "{\"context\": \"Dev\"}\n" {
+		t.Fatalf("opencode.json content = %q", string(data))
 	}
 }
 
@@ -100,7 +100,7 @@ func TestGenerate_SkipsStructuredWithoutTemplate(t *testing.T) {
 	}
 
 	for _, name := range r.Written {
-		if name == "opencode.toml" || name == ".claude/settings.json" {
+		if name == "opencode.json" || name == ".claude/settings.json" {
 			t.Fatalf("should not write %s without template", name)
 		}
 	}

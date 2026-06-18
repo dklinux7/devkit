@@ -230,7 +230,7 @@ var MarkdownTargets = []string{
 
 // Written only when a matching .tmpl file exists in templateDir
 var StructuredTargets = []string{
-    "opencode.toml",
+    "opencode.json",
     ".claude/settings.json",
 }
 ```
@@ -325,7 +325,7 @@ The `all:` prefix is required — without it, `go:embed` silently skips files wh
 
 `devkit init` copies the embedded tree to `~/.devkit/` verbatim. These files are starter scaffolds — the user edits them after init.
 
-**Structured config templates** (e.g., `templates/opencode.toml.tmpl`) are also embedded but are used by the generator at generate-time, not init-time. They are Go `text/template` files rendered with `TemplateData`.
+**Structured config templates** (e.g., `templates/opencode.json.tmpl`) are also embedded but are used by the generator at generate-time, not init-time. They are Go `text/template` files rendered with `TemplateData`.
 
 **Adding a new scaffold file:** Drop it into `templates/`. It will be copied on `devkit init` automatically.
 

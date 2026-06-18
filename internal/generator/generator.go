@@ -20,7 +20,7 @@ var MarkdownTargets = []string{
 }
 
 var StructuredTargets = []string{
-	"opencode.toml",
+	"opencode.json",
 	".claude/settings.json",
 }
 
