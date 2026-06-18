@@ -140,13 +140,16 @@ That's it. 2 fields.
 | `devkit generate --include-lessons` | Append lessons at end of output |
 | `devkit generate --force` | Bypass 32KB hard limit |
 | `devkit search <query>` | Search across all ~/.devkit/ markdown (uses ripgrep if available, Go-native fallback otherwise) |
+| `devkit reset` | Delete ~/.devkit/ and re-initialize with starter templates (with confirmation prompt) |
 
 ### v2+ Commands (build only when pain demands)
 
 | Command | Purpose |
 |---------|---------|
 | `devkit archive` | AI-summarize findings → lessons, compress originals |
-| `devkit backup` | Encrypted tarball of ~/.devkit/ |
+| `devkit backup` | Encrypted tarball of ~/.devkit/ (via `age`) |
+| `devkit sync` | Thin wrapper around git pull/push on ~/.devkit/ to make multi-machine sync discoverable |
+| `devkit search --interactive` | Interactive fuzzy search via fzf (if on $PATH) with go-fuzzyfinder fallback |
 
 ### Removed commands (not needed for solo user)
 
@@ -424,36 +427,47 @@ Note: `Glob` needed for `identity/*` file discovery. `embed` directives use `//g
 
 ## Implementation Checklist
 
-### Pre-work: Repo setup
-- [ ] Create GitHub repo `devkit` (PUBLIC, no license)
-- [ ] Initialize Go module (go 1.22+)
-- [ ] Set up CI (lint, test, govulncheck, trivy, go-licenses)
-- [ ] Configure Dependabot
-- [ ] Add trufflehog check
-- [ ] Write scaffold templates (identity, context, prompts, tools, research, analysis) — use `//go:embed all:templates` for dotfiles
-- [ ] Public repo .gitignore
+### Pre-work: Repo setup ✓ DONE
+- [x] Create GitHub repo `devkit` (PUBLIC, no license) — github.com/dklinux7/devkit
+- [x] Initialize Go module (go 1.25)
+- [x] Set up CI (lint, test, govulncheck, trivy, go-licenses)
+- [x] Configure Dependabot
+- [x] Add trufflehog check
+- [x] Write scaffold templates (identity, context, prompts, tools, research, analysis) — use `//go:embed all:templates` for dotfiles
+- [x] Public repo .gitignore
 
-### Milestone 1: `devkit generate` working (USE IT FOR A WEEK)
-- [ ] `internal/fs` — interface (with Glob) + real implementation
-- [ ] `internal/config` — load workspace.yaml, resolve data dir via `os.UserHomeDir()` + ".devkit", `$DEVKIT_HOME` override
-- [ ] `internal/devctx` — load identity/*.md + contexts/<active> + donts.md (strip frontmatter from all sources)
-- [ ] `internal/composer` — composition order (identity → context → donts), `\n\n` separators, size check (16KB warn, 32KB fail)
-- [ ] `internal/generator` — markdown targets (direct write) + structured targets (template render), overwrite reporting
-- [ ] `cmd/devkit/init.go` — scaffold ~/.devkit/ from embedded templates
-- [ ] `cmd/devkit/generate.go` — the core command (--dry-run, --include-lessons, --force)
-- [ ] `cmd/devkit/main.go` — cobra root
-- [ ] **USE IT DAILY. Let friction guide what to build next.**
+### Milestone 1: `devkit generate` working ✓ DONE
+- [x] `internal/fs` — interface (with Glob) + real implementation
+- [x] `internal/config` — load workspace.yaml, resolve data dir via `os.UserHomeDir()` + ".devkit", `$DEVKIT_HOME` override
+- [x] `internal/devctx` — load identity/*.md + contexts/<active> + donts.md (strip frontmatter from all sources)
+- [x] `internal/composer` — composition order (identity → context → donts), `\n\n` separators, size check (16KB warn, 32KB fail)
+- [x] `internal/generator` — markdown targets (direct write) + structured targets (template render), overwrite reporting
+- [x] `cmd/devkit/init.go` — scaffold ~/.devkit/ from embedded templates
+- [x] `cmd/devkit/generate.go` — the core command (--dry-run, --include-lessons, --force)
+- [x] `cmd/devkit/main.go` — cobra root
 
-### Milestone 2: Search + polish
-- [ ] `internal/search` — Go-native fallback (filepath.WalkDir + regexp), ripgrep when available (exec.Command with `--` separator)
-- [ ] `cmd/devkit/search.go` — search entry point
-- [ ] Binary releases (goreleaser OSS — macOS/Linux/Windows/arm64)
-- [ ] README
+### Milestone 2: Search + polish ✓ DONE
+- [x] `internal/search` — Go-native fallback (filepath.WalkDir + regexp), ripgrep when available (exec.Command with `--` separator)
+- [x] `cmd/devkit/search.go` — search entry point
+- [x] Binary releases (goreleaser OSS — macOS/Linux/Windows/arm64)
+- [x] README
+- [x] Makefile
+- [x] CI workflows (lint, test, govulncheck, go-licenses, trufflehog, trivy)
+- [x] Dependabot (go modules + GitHub Actions)
+- [x] `cmd/devkit/reset.go` — delete + re-initialize with confirmation
+- [x] `templates/analysis.tmpl.md` + `templates/research.tmpl.md`
+- [x] `docs/setup/github-multi-account.md`
+
+### Milestone 2.5: Search interactive + multi-machine sync
+- [ ] `devkit search --interactive` — fzf via exec.LookPath, go-fuzzyfinder as fallback (same pattern as ripgrep fallback)
+- [ ] `devkit sync` — git pull/push wrapper on ~/.devkit/ (makes multi-machine workflow discoverable)
+- [ ] `docs/setup/new-machine.md` — private git repo for ~/.devkit/ + mise setup guide
 
 ### Milestone 3: Archive (when findings > 50)
 - [ ] Summarizer interface (Manual + Claude implementations)
 - [ ] Compression to archive/
-- [ ] Encryption via `age`
+- [ ] Encryption via `age` (`filippo.io/age` Go library — BSD-3-Clause, no external binary needed)
+- [ ] `devkit backup` — encrypted tarball using age public key from workspace.yaml (`backup_recipient` field, optional)
 - [ ] `devkit archive` command
 
 ---
@@ -485,6 +499,27 @@ Note: `Glob` needed for `identity/*` file discovery. `embed` directives use `//g
 | Team sharing | Company's job. |
 | Separate projects/ from contexts/ | Company-scoped in practice. |
 | model/ package | Types are simple enough to live in each package for this codebase size. |
+| chezmoi for ~/.devkit/ sync | Overkill — copy model creates friction (must run `chezmoi add` after every edit). ~/.devkit/ is plain markdown + YAML, no secrets, no per-machine conditionals. A private git repo is sufficient and simpler. |
+| age for normal use (v1/v2) | ~/.devkit/ contains no secrets — coding style, work context, constraints. OS disk encryption (FileVault/LUKS/BitLocker) + chmod 700 + private git repo is appropriate protection. age belongs only in `devkit backup` (Milestone 3). |
+| just / Task to replace Makefile | Existing Makefile is clean, POSIX-compatible, 11 simple targets. Make is universally available on macOS/Linux with no install. Migrate to just only if Windows CI is ever added. Do not adopt mage (7-year-old unresolved bugs, stalled maintenance). |
+| Task file generation in devkit generate | devkit doesn't know the project's language or build system. A generic Taskfile would require immediate customization and risks colliding with existing task files. Scope creep. |
+| devbox for dev environment | No native Windows support (WSL only). Adds Nix as transitive dependency. mise covers the tool version management need with full cross-platform support. |
+| sops for secrets | Team/GitOps tool designed for cloud KMS (AWS/GCP/Azure). Overkill for a solo dev. age handles the personal backup encryption use case without infrastructure overhead. |
+| proto as mise alternative | 1,302 stars vs mise's 29,653. Single-maintainer company (moonrepo). Tiny ecosystem. Not a viable recommendation despite good Windows support. |
+
+---
+
+## Companion Tools
+
+Tools researched and evaluated for use alongside devkit. Decisions are final unless circumstances change.
+
+| Tool | Verdict | Use | Notes |
+|------|---------|-----|-------|
+| **fzf** (junegunn/fzf, 81k★, MIT) | Build into devkit | `devkit search --interactive` primary path | Detect via `exec.LookPath("fzf")`. go-fuzzyfinder as fallback (no external binary). Do NOT use fzf as an embedded Go library — the `src` package has no stable API. |
+| **go-fuzzyfinder** (ktr0731/go-fuzzyfinder, 519★, MIT) | Build into devkit | `devkit search --interactive` fallback | Pure Go, tcell-based, works on macOS/Linux/Windows. Clean API: `fuzzyfinder.Find(items, labelFn)`. Avoid go-fzf (koki-develop) — last release 2023, stale deps. |
+| **mise** (jdx/mise, 29k★, MIT) | Document as companion | Runtime version management | Best cross-platform tool version manager. Full Windows native support. Bus factor caveat: Jeff Dickey is ~85% of commits, funded solo project. Windows env var injection requires `mise x` or shim mode (not transparent activation). |
+| **age** (FiloSottile/age, 22k★, BSD-3-Clause) | Milestone 3 only | `devkit backup` encryption | `filippo.io/age` Go library embeds cleanly (~30 lines). Use public key mode (not passphrase) for backup. Optional `backup_recipient` field in workspace.yaml. OS disk encryption is sufficient for normal ~/.devkit/ use. |
+| **private git repo** | Document as companion | ~/.devkit/ multi-machine sync | Simplest solution — no extra tool. `devkit sync` (v2) wraps git pull/push to make it discoverable. chezmoi is overkill for plain markdown files. |
 
 ---
 
