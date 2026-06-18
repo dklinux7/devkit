@@ -8,7 +8,7 @@ exec devkit generate $WORK/project
 stdout '✓ Generated'
 
 exec devkit doctor
-stdout 'in-sync'
+stdout 'up-to-date'
 stdout $WORK/project
 
 -- workspace.yaml --

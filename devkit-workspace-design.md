@@ -644,7 +644,7 @@ Notes:
 - [x] Add macOS/Windows to CI test matrix
 - [x] Write missing critical test cases (dry-run-all, doctor-stale, lint-errors, pipeline-lifecycle)
 - [x] `devkit untrack <path>` — remove project from registry (medium backlog item, done early)
-- [x] Consolidate `status` and `doctor` — doctor is now a deprecated alias for status (content comparison canonical)
+- [x] `status` and `doctor` are distinct: status uses content comparison, doctor uses mtime comparison
 - [x] Add `--verbose` / `-v` flag — prints data dir, active context, composed size to stderr
 - [x] Test coverage reporting in CI — `-coverprofile` + artifact upload
 - [x] `mise.toml` for local dev tool versions (go 1.26, golangci-lint 2.12.2)
