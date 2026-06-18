@@ -21,7 +21,7 @@ jobs:
         run: go test ./...
 
       - name: Build
-        run: CGO_ENABLED=0 go build ./cmd/devkit
+        run: CGO_ENABLED=0 go build .
 
   lint:
     runs-on: ubuntu-latest
@@ -65,7 +65,9 @@ jobs:
       - name: go-licenses
         run: |
           go install github.com/google/go-licenses@latest
-          go-licenses check ./... --allowed_licenses=MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC
+          go-licenses check ./... \
+            --allowed_licenses=MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC \
+            --ignore github.com/dklinux7/devkit
 
   secrets:
     runs-on: ubuntu-latest
