@@ -34,7 +34,9 @@ func TestGenerate_MarkdownTargets(t *testing.T) {
 
 func TestGenerate_OverwriteReporting(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/project/CLAUDE.md", []byte("old content"), 0644)
+	if err := m.WriteFile("/project/CLAUDE.md", []byte("old content"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	ws := &config.Workspace{Name: "Test", ActiveContext: "work"}
 
 	content := "new content"
@@ -59,7 +61,9 @@ func TestGenerate_OverwriteReporting(t *testing.T) {
 
 func TestGenerate_StructuredTargets(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/templates/opencode.toml.tmpl", []byte("[context]\ncontent = \"{{.Workspace.Name}}\"\n"), 0644)
+	if err := m.WriteFile("/templates/opencode.toml.tmpl", []byte("[context]\ncontent = \"{{.Workspace.Name}}\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	ws := &config.Workspace{Name: "Dev", ActiveContext: "work"}
 
 	r, err := Generate(m, "/project", "composed content", ws, "/templates")
@@ -104,7 +108,9 @@ func TestGenerate_SkipsStructuredWithoutTemplate(t *testing.T) {
 
 func TestGenerate_CreatesSubdirectory(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/templates/.claude/settings.json.tmpl", []byte(`{"name": "{{.Workspace.Name}}"}`), 0644)
+	if err := m.WriteFile("/templates/.claude/settings.json.tmpl", []byte(`{"name": "{{.Workspace.Name}}"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
 	ws := &config.Workspace{Name: "Test", ActiveContext: "work"}
 
 	_, err := Generate(m, "/project", "content", ws, "/templates")

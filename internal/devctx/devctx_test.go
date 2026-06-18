@@ -25,10 +25,18 @@ func TestStripFrontmatter_NoFrontmatter(t *testing.T) {
 
 func TestLoad_Basic(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/dk/identity/ai.md", []byte("---\ntitle: ai\n---\nBe concise."), 0644)
-	m.WriteFile("/dk/identity/engineering.md", []byte("Use Go."), 0644)
-	m.WriteFile("/dk/contexts/work.md", []byte("---\ncompany: acme\n---\nAcme Corp context."), 0644)
-	m.WriteFile("/dk/donts.md", []byte("Never commit secrets."), 0644)
+	if err := m.WriteFile("/dk/identity/ai.md", []byte("---\ntitle: ai\n---\nBe concise."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/identity/engineering.md", []byte("Use Go."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/contexts/work.md", []byte("---\ncompany: acme\n---\nAcme Corp context."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/donts.md", []byte("Never commit secrets."), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	src, err := Load(m, "/dk", "work", false)
 	if err != nil {
@@ -53,10 +61,18 @@ func TestLoad_Basic(t *testing.T) {
 
 func TestLoad_WithLessons(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/dk/identity/ai.md", []byte("Be concise."), 0644)
-	m.WriteFile("/dk/contexts/work.md", []byte("Context."), 0644)
-	m.WriteFile("/dk/donts.md", []byte("Donts."), 0644)
-	m.WriteFile("/dk/lessons/acme-2024.md", []byte("---\ncompany: acme\n---\nLesson 1."), 0644)
+	if err := m.WriteFile("/dk/identity/ai.md", []byte("Be concise."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/contexts/work.md", []byte("Context."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/donts.md", []byte("Donts."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/lessons/acme-2024.md", []byte("---\ncompany: acme\n---\nLesson 1."), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	src, err := Load(m, "/dk", "work", true)
 	if err != nil {
@@ -72,11 +88,21 @@ func TestLoad_WithLessons(t *testing.T) {
 
 func TestLoad_ContextFolder(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/dk/identity/ai.md", []byte("AI rules."), 0644)
-	m.WriteFile("/dk/contexts/bigco/main.md", []byte("Main context."), 0644)
-	m.WriteFile("/dk/contexts/bigco/services.md", []byte("Services list."), 0644)
-	m.WriteFile("/dk/donts.md", []byte("Donts."), 0644)
-	m.MkdirAll("/dk/contexts/bigco", 0755)
+	if err := m.WriteFile("/dk/identity/ai.md", []byte("AI rules."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/contexts/bigco/main.md", []byte("Main context."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/contexts/bigco/services.md", []byte("Services list."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/donts.md", []byte("Donts."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.MkdirAll("/dk/contexts/bigco", 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	src, err := Load(m, "/dk", "bigco", false)
 	if err != nil {
@@ -89,8 +115,12 @@ func TestLoad_ContextFolder(t *testing.T) {
 
 func TestLoad_MissingContext(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/dk/identity/ai.md", []byte("AI rules."), 0644)
-	m.WriteFile("/dk/donts.md", []byte("Donts."), 0644)
+	if err := m.WriteFile("/dk/identity/ai.md", []byte("AI rules."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dk/donts.md", []byte("Donts."), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	src, err := Load(m, "/dk", "nonexistent", false)
 	if err != nil {

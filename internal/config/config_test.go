@@ -8,7 +8,9 @@ import (
 
 func TestLoad_Valid(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/home/.devkit/workspace.yaml", []byte("name: John\nactive_context: work\n"), 0644)
+	if err := m.WriteFile("/home/.devkit/workspace.yaml", []byte("name: John\nactive_context: work\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	ws, err := Load(m, "/home/.devkit")
 	if err != nil {
@@ -32,7 +34,9 @@ func TestLoad_MissingFile(t *testing.T) {
 
 func TestLoad_MissingName(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/home/.devkit/workspace.yaml", []byte("active_context: work\n"), 0644)
+	if err := m.WriteFile("/home/.devkit/workspace.yaml", []byte("active_context: work\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(m, "/home/.devkit")
 	if err == nil {
@@ -42,7 +46,9 @@ func TestLoad_MissingName(t *testing.T) {
 
 func TestLoad_MissingActiveContext(t *testing.T) {
 	m := fs.NewMemFS()
-	m.WriteFile("/home/.devkit/workspace.yaml", []byte("name: John\n"), 0644)
+	if err := m.WriteFile("/home/.devkit/workspace.yaml", []byte("name: John\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err := Load(m, "/home/.devkit")
 	if err == nil {

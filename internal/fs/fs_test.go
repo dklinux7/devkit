@@ -33,7 +33,9 @@ func TestMemFS_Exists(t *testing.T) {
 		t.Fatal("expected false for nonexistent path")
 	}
 
-	m.WriteFile("/tmp/file", []byte("x"), 0644)
+	if err := m.WriteFile("/tmp/file", []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	if !m.Exists("/tmp/file") {
 		t.Fatal("expected true for existing file")
 	}
@@ -56,9 +58,15 @@ func TestMemFS_MkdirAll(t *testing.T) {
 
 func TestMemFS_ReadDir(t *testing.T) {
 	m := NewMemFS()
-	m.WriteFile("/dir/a.md", []byte("a"), 0644)
-	m.WriteFile("/dir/b.md", []byte("b"), 0644)
-	m.WriteFile("/dir/sub/c.md", []byte("c"), 0644)
+	if err := m.WriteFile("/dir/a.md", []byte("a"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dir/b.md", []byte("b"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dir/sub/c.md", []byte("c"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	entries, err := m.ReadDir("/dir")
 	if err != nil {
@@ -77,9 +85,15 @@ func TestMemFS_ReadDir(t *testing.T) {
 
 func TestMemFS_Glob(t *testing.T) {
 	m := NewMemFS()
-	m.WriteFile("/dir/a.md", []byte("a"), 0644)
-	m.WriteFile("/dir/b.txt", []byte("b"), 0644)
-	m.WriteFile("/dir/c.md", []byte("c"), 0644)
+	if err := m.WriteFile("/dir/a.md", []byte("a"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dir/b.txt", []byte("b"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.WriteFile("/dir/c.md", []byte("c"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	matches, err := m.Glob("/dir/*.md")
 	if err != nil {
@@ -92,8 +106,12 @@ func TestMemFS_Glob(t *testing.T) {
 
 func TestMemFS_Stat(t *testing.T) {
 	m := NewMemFS()
-	m.WriteFile("/file.txt", []byte("content"), 0644)
-	m.MkdirAll("/mydir", 0755)
+	if err := m.WriteFile("/file.txt", []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.MkdirAll("/mydir", 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	info, err := m.Stat("/file.txt")
 	if err != nil {
