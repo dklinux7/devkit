@@ -1,9 +1,9 @@
 # devkit — Personal Dev Workspace Design Document
 
-**Status:** ACTIVE — Milestone 2.5 substantially complete, post-audit hardening in progress.
+**Status:** ACTIVE — Milestones 2.5 and 2.75 complete. Daily use phase.
 **Date started:** 2026-06-18
 **Design locked:** 2026-06-18
-**Last updated:** 2026-06-18 (engineering audit — security, architecture, code quality, AI workflow fixes)
+**Last updated:** 2026-06-18 (docs deep-dive: README, developer guide, testing guide, setup guides all updated)
 **Goal:** Make you + AI maximally productive. Not portable, not generic, not elegant — productive.
 
 ---
