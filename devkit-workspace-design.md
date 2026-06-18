@@ -1,9 +1,9 @@
 # devkit — Personal Dev Workspace Design Document
 
-**Status:** DESIGN LOCKED — implementation ready.
+**Status:** ACTIVE — Milestone 2 complete, Milestone 2.5 in progress.
 **Date started:** 2026-06-18
 **Design locked:** 2026-06-18
-**Final review:** 2026-06-18 (all issues from analysis resolved below)
+**Last updated:** 2026-06-18 (AI tool landscape research, plug-and-play decisions, roadmap expanded)
 **Goal:** Make you + AI maximally productive. Not portable, not generic, not elegant — productive.
 
 ---
@@ -11,10 +11,18 @@
 ## Problem Statement
 
 Current workspace is tightly coupled to one employer. Need a personal workspace that:
-- Works with any AI coding tool (Claude Code, OpenCode, Cursor, Copilot, Windsurf)
+- Works with any AI coding tool (Claude Code, OpenCode, Cursor, Copilot, Windsurf, Gemini CLI, Aider, Continue.dev, Zed, and whatever comes next)
 - Works at any company (swap context, not rebuild)
 - Works on macOS, Linux, Windows
 - Philosophy: install binary → `devkit init` → `devkit generate ~/project` → done
+
+### AI Tool Landscape (as of 2026)
+
+15+ active AI coding tools exist. Two standards are converging:
+- **AGENTS.md** — Linux Foundation / Agentic AI Foundation. 60k+ projects. Supported by every major tool. Plain markdown, no schema required. This is the `.editorconfig` of AI tools.
+- **MCP (Model Context Protocol)** — Anthropic-originated, now broadly adopted. Standard JSON schema for connecting AI tools to live data sources and APIs. Every major tool supports it.
+
+devkit's role: generate static identity + context files for all tools from a single source of truth. MCP servers (Jira, Slack, GitHub, Postgres) are the AI tool's job, not devkit's.
 
 ---
 
@@ -23,9 +31,10 @@ Current workspace is tightly coupled to one employer. Need a personal workspace 
 > 1. Canonical format is markdown. All AI tools read it.
 > 2. Zero known vulnerabilities. Clean deps at all times.
 > 3. Public repo = the tool. User data = private, separate.
-> 4. workspace.yaml = 2 fields. Everything else in markdown.
+> 4. workspace.yaml = minimal fields. Everything else in markdown.
 > 5. Hard output limit: >16KB warns, >32KB fails (unless --force).
 > 6. If it doesn't help solve a production problem, understand a codebase, or use AI better within 30 days — don't build it in v1.
+> 7. devkit provides static context. AI tools provide dynamic integrations. Never cross this boundary.
 
 ---
 
@@ -110,54 +119,105 @@ All rights reserved.
 
 ---
 
-## workspace.yaml — Final Schema
+## workspace.yaml — Schema
 
 ```yaml
 name: "Your Name"
 active_context: work
+extra_targets:        # optional — additional output files beyond the defaults
+  - .roo/system-prompt.md
+  - .amp/context.md
+backup_recipient: ""  # optional — age public key for devkit backup (Milestone 3)
 ```
 
-That's it. 2 fields.
-
+Core fields:
 - `name` — used in templates
 - `active_context` — which context file/folder to load from `contexts/`
 
+Optional fields:
+- `extra_targets` — list of additional output file paths appended to the default markdown target list. Enables new AI tool support without a devkit release. Paths are relative to the target project directory.
+- `backup_recipient` — age public key (`age1...`) used by `devkit backup`. Leave empty until Milestone 3 is built.
+
 **What's NOT here:** ai_tools (generate everything — disk is free), integrations (belong in context prose), role/languages (in identity/ai.md).
 
-**Switching context:** Edit `active_context`, run `devkit generate`. One line edit.
+**Switching context:** Edit `active_context`, run `devkit generate --all`. One line edit, all projects updated.
+
+### Default markdown targets (always generated)
+
+```
+CLAUDE.md
+AGENTS.md
+.cursorrules
+.windsurfrules
+copilot-instructions.md   (written to .github/copilot-instructions.md)
+GEMINI.md
+```
+
+### Default structured targets (template-rendered)
+
+```
+opencode.json
+.mcp.json                  ← project-level MCP server config (Milestone 2.5)
+.claude/settings.json
+```
+
+### AI tool config file reference
+
+| Tool | Files read | Format |
+|------|-----------|--------|
+| Claude Code | `CLAUDE.md`, `.claude/rules/*.md`, `AGENTS.md` | Markdown |
+| GitHub Copilot | `.github/copilot-instructions.md`, `AGENTS.md` | Markdown |
+| Cursor | `.cursorrules`, `.cursor/rules/*.mdc` | Markdown + YAML frontmatter |
+| Windsurf | `.windsurfrules` | Markdown |
+| Gemini CLI | `GEMINI.md`, `~/.gemini/settings.json` | Markdown + JSON |
+| OpenCode | `opencode.json`, `AGENTS.md` | JSONC |
+| Aider | `.aider.conf.yml`, `CONVENTIONS.md` | YAML + Markdown |
+| Continue.dev | `~/.continue/config.yaml` | YAML |
+| Zed | `settings.json` (`context_servers` key) | JSON |
+| Devin | `AGENTS.md`, `.devin/rules/*.md` | Markdown |
+| Warp | `AGENTS.md` | Markdown |
+| JetBrains Junie | `AGENTS.md` | Markdown |
 
 ---
 
 ## Go CLI — `devkit`
 
-### v1 Commands (all that's needed)
+### v1 Commands ✓ DONE
 
 | Command | Purpose |
 |---------|---------|
 | `devkit init` | Creates ~/.devkit/, scaffolds from templates |
-| `devkit generate <path>` | Reads identity + context + donts → writes CLAUDE.md, AGENTS.md, .cursorrules, etc. directly to target |
+| `devkit generate <path>` | Reads identity + context + donts → writes all AI config files to target |
 | `devkit generate --dry-run` | Show what would be generated |
 | `devkit generate --include-lessons` | Append lessons at end of output |
 | `devkit generate --force` | Bypass 32KB hard limit |
-| `devkit search <query>` | Search across all ~/.devkit/ markdown (uses ripgrep if available, Go-native fallback otherwise) |
-| `devkit reset` | Delete ~/.devkit/ and re-initialize with starter templates (with confirmation prompt) |
+| `devkit search <query>` | Search across all ~/.devkit/ markdown (ripgrep if available, Go-native fallback) |
+| `devkit reset` | Delete ~/.devkit/ and re-initialize with confirmation |
 
-### v2+ Commands (build only when pain demands)
+### Milestone 2.5 Commands
 
 | Command | Purpose |
 |---------|---------|
+| `devkit generate --all` | Regenerate all previously-generated project paths (tracked in `~/.devkit/projects.txt`) |
+| `devkit search --interactive` | Fuzzy search — fzf via `exec.LookPath`, go-fuzzyfinder fallback |
+| `devkit context ls` | List all contexts with size + last-modified date |
+| `devkit doctor` | Show which generated project files are stale (source newer than output) |
+| `devkit sync` | git pull/push on ~/.devkit/ — makes multi-machine sync discoverable |
+
+### v2 Commands (MCP era)
+
+| Command | Purpose |
+|---------|---------|
+| `devkit serve` | Run devkit as a local MCP server — AI tools query identity/context/constraints live instead of reading stale files |
 | `devkit archive` | AI-summarize findings → lessons, compress originals |
-| `devkit backup` | Encrypted tarball of ~/.devkit/ (via `age`) |
-| `devkit sync` | Thin wrapper around git pull/push on ~/.devkit/ to make multi-machine sync discoverable |
-| `devkit search --interactive` | Interactive fuzzy search via fzf (if on $PATH) with go-fuzzyfinder fallback |
+| `devkit backup` | Encrypted tarball of ~/.devkit/ via `filippo.io/age` |
 
 ### Removed commands (not needed for solo user)
 
 | Command | Why |
 |---------|-----|
-| `devkit switch` | Edit one YAML line + generate. Not worth a command. |
+| `devkit switch` | Edit one YAML line + `devkit generate --all`. Not worth a command. |
 | `devkit validate` | You know if your tools work. |
-| `devkit doctor` | Clear error messages suffice. |
 | `devkit new-context` | `cp templates/context.tmpl.md ~/.devkit/contexts/new.md`. |
 | `devkit diff` | `git diff CLAUDE.md` in target project. |
 | `devkit capture` | `$EDITOR ~/.devkit/findings/new-note.md`. Not worth code. |
@@ -196,27 +256,50 @@ Composer outputs a canonical markdown blob. Generator writes it to markdown targ
 header := "<!-- Generated by devkit. Do not edit. Contains private context. Source: ~/.devkit/ -->\n\n"
 content := header + compose(identity, context, donts)  // concatenate in order, \n\n between sections
 
-// Markdown targets — write content directly
-for _, name := range []string{"CLAUDE.md", "AGENTS.md", ".cursorrules", ".windsurfrules", "copilot-instructions.md"} {
+// Default markdown targets + extra_targets from workspace.yaml
+defaultTargets := []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md", ".cursorrules", ".windsurfrules",
+    ".github/copilot-instructions.md"}
+allTargets := append(defaultTargets, workspace.ExtraTargets...)
+for _, name := range allTargets {
     writeFile(filepath.Join(target, name), content)
 }
 
 // Structured targets — render through templates (text/template)
-for _, tmpl := range []string{"opencode.toml", ".claude/settings.json"} {
+for _, tmpl := range []string{"opencode.json", ".mcp.json", ".claude/settings.json"} {
     if templateExists(tmpl) {
         rendered := renderTemplate(tmpl, workspace, content)
         writeFile(filepath.Join(target, tmpl), rendered)
     }
 }
+
+// Track this path for devkit generate --all
+appendToProjectsRegistry(target)
 ```
 
 Every generated file starts with a header line so you never wonder "should I edit this directly?" The answer is always: edit the source in `~/.devkit/`, then regenerate.
 
 **Overwrite behavior:** If a target file exists and differs from what would be generated, print which files are being overwritten. The header ("do not edit") is the contract — if you edited it manually, regeneration replaces it.
 
-Tool-specific configs (Claude's settings.json, OpenCode's opencode.toml) are Go `text/template` files in the public repo's `templates/` dir. `devkit generate` renders them from workspace.yaml + composed content. No interface, no adapter pattern — just template files + a render loop.
+**`extra_targets`:** Any paths in `workspace.yaml.extra_targets` are appended to the default list. Relative to the target project directory. This is how new AI tools are supported without a devkit release — the user adds one line to workspace.yaml.
 
-If a new AI tool appears: add one template file + one filename to the loop. 5 minutes of work.
+**Projects registry:** Every successful `devkit generate <path>` appends the absolute path to `~/.devkit/projects.txt`. `devkit generate --all` reads this file and regenerates each path, skipping any that no longer exist.
+
+**`.mcp.json` generation (Milestone 2.5):** Generates a project-level MCP config from an `mcp_servers` section in the active context file. Format mirrors the cross-tool standard:
+```yaml
+# in contexts/work.md frontmatter (optional)
+mcp_servers:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+  jira:
+    command: npx
+    args: ["-y", "@some/jira-mcp-server"]
+```
+devkit renders this into `.mcp.json` at the project root. Env var values with `${VAR}` are kept as-is — the user's shell resolves them at runtime.
+
+Tool-specific structured configs are Go `text/template` files in the public repo's `templates/` dir. No interface, no adapter pattern — just template files + a render loop. New structured target: add one `.tmpl` file + one filename to the list.
 
 ---
 
@@ -353,6 +436,42 @@ Maintainer workflow: `make update && make check` before tagging release.
 
 ---
 
+## MCP Server Mode (v2 — `devkit serve`)
+
+Eliminates the "regenerate after identity change" problem. Instead of writing static files, devkit runs as a local MCP server that AI tools query on every session.
+
+```
+devkit serve
+→ Speaks MCP over stdio (JSON-RPC 2.0)
+→ Exposes three Resources:
+    devkit://identity         ← composed identity/ai.md + identity/engineering.md
+    devkit://context/{name}   ← contexts/<name>.md (default: active_context)
+    devkit://constraints      ← donts.md
+→ Claude Code (or any MCP client) calls these instead of reading CLAUDE.md
+```
+
+**Config in target project** (generated by `devkit generate`, Milestone 2.5+):
+```json
+{
+  "mcpServers": {
+    "devkit": {
+      "command": "devkit",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+**Why this is v2, not now:**
+- Creates a daemon dependency — `devkit` binary must be on PATH and runnable at AI tool startup
+- Static files work fine and are already implemented
+- MCP client support across tools is broad but not universal (Cursor, Copilot file-based rules still dominate)
+- Build when the "forget to regenerate" problem becomes a daily friction point
+
+**Implementation:** ~200 lines of Go. MCP stdio transport is JSON-RPC 2.0 line-delimited. No external SDK needed for a read-only resource server.
+
+---
+
 ## Archive Pipeline (v2 — build only when findings > 50)
 
 ```
@@ -392,20 +511,27 @@ created: 2026-06-18
 ```
 internal/
 ├── fs/           ← filesystem interface (testable with in-memory)
-├── config/       ← loads workspace.yaml (2 fields), resolves data dir via os.UserHomeDir()
+├── config/       ← loads workspace.yaml, resolves data dir via os.UserHomeDir()
 ├── devctx/       ← loads identity/*, contexts/<active>, donts.md (NOT "context" — avoids stdlib shadow)
 ├── composer/     ← composition order, frontmatter stripping, \n\n separators, size enforcement
 ├── generator/    ← write markdown targets + render template targets to target path
-└── search/       ← ripgrep with Go-native fallback
+├── search/       ← ripgrep with Go-native fallback
+├── registry/     ← read/write ~/.devkit/projects.txt (Milestone 2.5)
+└── mcp/          ← parse mcp_servers from context frontmatter, render .mcp.json (Milestone 2.5)
 
 cmd/devkit/
 ├── main.go       ← root command (cobra)
 ├── init.go       ← scaffolds ~/.devkit/
-├── generate.go   ← the core command
-└── search.go     ← search entry point
+├── reset.go      ← delete + re-initialize with confirmation
+├── generate.go   ← the core command (--dry-run, --include-lessons, --force, --all, --git-context)
+├── search.go     ← search entry point (--interactive flag)
+├── context.go    ← devkit context ls (Milestone 2.5)
+├── doctor.go     ← stale detection (Milestone 2.5)
+├── sync.go       ← git pull/push on ~/.devkit/ (Milestone 2.5)
+└── serve.go      ← MCP server mode (v2)
 ```
 
-No model/ package needed — the types are simple enough to live in each package. No adapter interface — it's a for-loop over filenames. No validator, no doctor, no archive in v1.
+No model/ package needed — types are simple enough to live in each package. No adapter interface — it's a for-loop over filenames.
 
 ### FS interface
 
@@ -458,17 +584,29 @@ Note: `Glob` needed for `identity/*` file discovery. `embed` directives use `//g
 - [x] `templates/analysis.tmpl.md` + `templates/research.tmpl.md`
 - [x] `docs/setup/github-multi-account.md`
 
-### Milestone 2.5: Search interactive + multi-machine sync
-- [ ] `devkit search --interactive` — fzf via exec.LookPath, go-fuzzyfinder as fallback (same pattern as ripgrep fallback)
-- [ ] `devkit sync` — git pull/push wrapper on ~/.devkit/ (makes multi-machine workflow discoverable)
+### Milestone 2.5: Plug and play + quality of life
+- [ ] `extra_targets` in workspace.yaml — user-defined additional output files, merged with defaults in generator
+- [ ] `~/.devkit/projects.txt` registry — append on every `devkit generate`, read by `--all`
+- [ ] `devkit generate --all` — regenerate all tracked project paths
+- [ ] `devkit doctor` — compare mtime of identity/context sources vs generated files, print stale projects
+- [ ] `devkit context ls` — list contexts/ with size + last-modified date
+- [ ] `devkit search --interactive` — fzf via exec.LookPath, go-fuzzyfinder as fallback
+- [ ] `devkit sync` — git pull/push wrapper on ~/.devkit/
+- [ ] `.mcp.json` generation — parse `mcp_servers` from context frontmatter, render to project
+- [ ] `GEMINI.md` added to default markdown targets
 - [ ] `docs/setup/new-machine.md` — private git repo for ~/.devkit/ + mise setup guide
 
-### Milestone 3: Archive (when findings > 50)
+### Milestone 3: Archive + backup (when findings > 50)
 - [ ] Summarizer interface (Manual + Claude implementations)
 - [ ] Compression to archive/
 - [ ] Encryption via `age` (`filippo.io/age` Go library — BSD-3-Clause, no external binary needed)
-- [ ] `devkit backup` — encrypted tarball using age public key from workspace.yaml (`backup_recipient` field, optional)
+- [ ] `devkit backup` — encrypted tarball using age public key (`backup_recipient` in workspace.yaml, optional)
 - [ ] `devkit archive` command
+
+### v2: MCP server mode
+- [ ] `devkit serve` — stdio MCP server exposing three resources: `identity`, `context/{name}`, `constraints`
+- [ ] Add to scaffold: `.mcp.json` stub pointing at `devkit serve` for Claude Code / VS Code / Gemini CLI
+- [ ] Document: once `devkit serve` is in `.mcp.json`, static file regeneration is optional for MCP-capable tools
 
 ---
 
@@ -506,6 +644,13 @@ Note: `Glob` needed for `identity/*` file discovery. `embed` directives use `//g
 | devbox for dev environment | No native Windows support (WSL only). Adds Nix as transitive dependency. mise covers the tool version management need with full cross-platform support. |
 | sops for secrets | Team/GitOps tool designed for cloud KMS (AWS/GCP/Azure). Overkill for a solo dev. age handles the personal backup encryption use case without infrastructure overhead. |
 | proto as mise alternative | 1,302 stars vs mise's 29,653. Single-maintainer company (moonrepo). Tiny ecosystem. Not a viable recommendation despite good Windows support. |
+| Dynamic context injection (Jira/Slack/GitHub API) | devkit never makes API calls. That's the AI tool's job via MCP servers. Principle 7: devkit provides static context, AI tools provide dynamic integrations. |
+| AI-to-AI context broker | Already solved — sub-agents inherit CLAUDE.md from the project. The generated file IS the broker. The MCP serve mode handles the edge case (agents outside any project dir). |
+| Company onboarding packs | Behavior doesn't exist in the ecosystem yet. Build devkit sync first. Revisit when a company actually publishes a context pack. |
+| Plugin hooks (pre/post generate shell scripts) | No concrete use case yet. Build when you have 3+ cases that can't be solved by a flag. Shell hooks are the right implementation when the time comes — not Go interfaces. |
+| Plugin architecture / plugin registry | Over-engineering. `extra_targets` in workspace.yaml solves new-tool support. Template files solve structured config. No plugin system needed. |
+| Full TUI (bubbletea) for search | `bubbles list.Model` requires adopting the bubbletea event loop across the entire app — significant architectural commitment for a single feature. fzf + go-fuzzyfinder fallback is sufficient. |
+| CrewAI / LangGraph config generation | Agent framework configs are project-specific code, not identity/context. Wrong layer for devkit. |
 
 ---
 
