@@ -87,7 +87,7 @@ git init ~/.devkit/
 cd ~/.devkit/
 
 # Create a .gitignore if needed
-echo "*.devkit-tmp" > .gitignore
+echo ".devkit-tmp*" > .gitignore
 
 # Create a private repo on GitHub (or GitLab, Bitbucket, etc.)
 # Then add the remote:
@@ -111,19 +111,13 @@ devkit context ls
 
 ### Day-to-day sync
 
-After editing files in `~/.devkit/`:
+After editing files in `~/.devkit/`, sync across machines with:
 
 ```bash
-cd ~/.devkit/
-git add -A && git commit -m "update identity" && git push
+devkit sync
 ```
 
-On other machines:
-
-```bash
-cd ~/.devkit/
-git pull
-```
+This runs `git pull --rebase && git push` on `~/.devkit/`. Requires the private git repo to be set up as described above.
 
 ---
 
@@ -139,10 +133,13 @@ This writes:
 - `CLAUDE.md` — Claude Code
 - `AGENTS.md` — all AGENTS.md-compatible tools
 - `GEMINI.md` — Gemini CLI
+- `CONVENTIONS.md` — Aider
 - `.cursorrules` — Cursor (legacy)
 - `.cursor/rules/devkit-context.mdc` — Cursor (current)
 - `.windsurfrules` — Windsurf
 - `.github/copilot-instructions.md` — GitHub Copilot
+- `.claude/rules/devkit-context.md` — Claude Code scoped rules
+- `.kiro/steering/identity.md` — AWS Kiro
 
 ### Regenerate all tracked projects at once
 
@@ -157,10 +154,14 @@ devkit generate --all
 ## 6. Useful commands
 
 ```bash
-devkit status          # check which projects are in-sync vs stale
-devkit doctor          # mtime-based stale detection
-devkit diff ~/project  # see what generate would change
-devkit lint            # validate your ~/.devkit/ source files
-devkit context ls      # list contexts with size and date
-devkit search "query"  # search across all ~/.devkit/ markdown
+devkit status              # content comparison: in-sync vs stale
+devkit doctor              # mtime-based stale detection (faster than status)
+devkit diff ~/project      # see what generate would change; --check exits 1 if anything would change
+devkit lint                # validate your ~/.devkit/ source files
+devkit context ls          # list contexts with size and date
+devkit search "query"      # search across all ~/.devkit/ markdown; --interactive for fzf UI
+devkit sync                # sync ~/.devkit/ across machines (git pull --rebase + push)
+devkit untrack ~/project   # remove a project from the tracking registry
+devkit generate --all      # regenerate all tracked projects at once
+devkit version             # print current version
 ```
