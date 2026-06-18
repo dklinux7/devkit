@@ -56,6 +56,28 @@ func TestLoad_MissingActiveContext(t *testing.T) {
 	}
 }
 
+func TestLoad_ExtraTargets(t *testing.T) {
+	m := fs.NewMemFS()
+	yaml := "name: John\nactive_context: work\nextra_targets:\n  - custom/tool.md\n  - .roo/system-prompt.md\n"
+	if err := m.WriteFile("/home/.devkit/workspace.yaml", []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ws, err := Load(m, "/home/.devkit")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(ws.ExtraTargets) != 2 {
+		t.Fatalf("ExtraTargets len = %d, want 2", len(ws.ExtraTargets))
+	}
+	if ws.ExtraTargets[0] != "custom/tool.md" {
+		t.Fatalf("ExtraTargets[0] = %q, want %q", ws.ExtraTargets[0], "custom/tool.md")
+	}
+	if ws.ExtraTargets[1] != ".roo/system-prompt.md" {
+		t.Fatalf("ExtraTargets[1] = %q, want %q", ws.ExtraTargets[1], ".roo/system-prompt.md")
+	}
+}
+
 func TestDataDir_Default(t *testing.T) {
 	t.Setenv("DEVKIT_HOME", "")
 	dir, err := DataDir()

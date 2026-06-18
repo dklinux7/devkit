@@ -16,7 +16,11 @@ func (f *OsFS) ReadFile(path string) ([]byte, error) {
 }
 
 func (f *OsFS) WriteFile(path string, data []byte, perm os.FileMode) error {
-	return os.WriteFile(path, data, perm)
+	tmp := path + ".devkit-tmp"
+	if err := os.WriteFile(tmp, data, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 func (f *OsFS) ReadDir(path string) ([]os.DirEntry, error) {

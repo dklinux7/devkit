@@ -1,0 +1,14 @@
+# devkit reset without --hard preserves user files
+env DEVKIT_HOME=$WORK/devkit-home
+exec devkit init
+cp $WORK/identity.md $WORK/devkit-home/identity/ai.md
+stdin $WORK/yes.txt
+exec devkit reset
+exists $WORK/devkit-home/identity/ai.md
+grep 'my custom identity' $WORK/devkit-home/identity/ai.md
+
+-- identity.md --
+my custom identity
+
+-- yes.txt --
+yes

@@ -1,0 +1,5 @@
+# devkit status with no tracked projects returns error
+env DEVKIT_HOME=$WORK/devkit-home
+exec devkit init
+! exec devkit status
+stderr 'no projects tracked'

@@ -5,7 +5,7 @@ exec devkit init
 cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
 
 stdin $WORK/yes.txt
-exec devkit reset
+exec devkit reset --hard
 stdout '✓ Created'
 
 exists $WORK/devkit-home/workspace.yaml

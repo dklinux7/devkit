@@ -1,0 +1,13 @@
+# generate --quiet produces no stdout on success
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate --quiet $WORK/project
+! stdout .
+exists $WORK/project/CLAUDE.md
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

@@ -1,0 +1,5 @@
+# devkit context ls lists contexts
+env DEVKIT_HOME=$WORK/devkit-home
+exec devkit init
+exec devkit context ls
+stdout 'work'

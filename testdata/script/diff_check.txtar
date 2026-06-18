@@ -1,0 +1,16 @@
+# devkit diff --check exits 1 when files would change
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project
+cp $WORK/modified.md $WORK/project/CLAUDE.md
+! exec devkit diff --check $WORK/project
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work
+
+-- modified.md --
+manually edited content

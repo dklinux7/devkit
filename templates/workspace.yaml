@@ -1,2 +1,5 @@
 name: "Your Name"
 active_context: work
+# extra_targets:   # optional — additional output files (relative to target project dir)
+#   - .roo/system-prompt.md
+#   - .amp/context.md

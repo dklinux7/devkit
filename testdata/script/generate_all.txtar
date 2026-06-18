@@ -1,0 +1,17 @@
+# generate --all regenerates all tracked projects
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project1
+mkdir $WORK/project2
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project1
+exec devkit generate $WORK/project2
+exec devkit generate --all
+stdout 'Generated'
+exists $WORK/project1/CLAUDE.md
+exists $WORK/project2/CLAUDE.md
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

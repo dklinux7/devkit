@@ -11,6 +11,7 @@ import (
 	"github.com/dklinux7/devkit/internal/devctx"
 	dkfs "github.com/dklinux7/devkit/internal/fs"
 	"github.com/dklinux7/devkit/internal/generator"
+	"github.com/dklinux7/devkit/internal/registry"
 	"github.com/spf13/cobra"
 )
 
@@ -18,12 +19,14 @@ var (
 	dryRun         bool
 	includeLessons bool
 	force          bool
+	generateAll    bool
+	quiet          bool
 )
 
 var generateCmd = &cobra.Command{
 	Use:   "generate <path>",
 	Short: "Compose identity + context → write AI config files to target",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	RunE:  runGenerate,
 }
 
@@ -31,17 +34,17 @@ func init() {
 	generateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be generated without writing")
 	generateCmd.Flags().BoolVar(&includeLessons, "include-lessons", false, "append lessons at end of output")
 	generateCmd.Flags().BoolVar(&force, "force", false, "bypass 32KB size limit")
+	generateCmd.Flags().BoolVar(&generateAll, "all", false, "regenerate all tracked project paths")
+	generateCmd.Flags().BoolVar(&quiet, "quiet", false, "suppress output on success")
 	rootCmd.AddCommand(generateCmd)
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
-	targetDir, err := filepath.Abs(args[0])
-	if err != nil {
-		return fmt.Errorf("resolving target path: %w", err)
+	if !generateAll && len(args) != 1 {
+		return fmt.Errorf("requires exactly 1 argument (target path), or use --all")
 	}
-
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		return fmt.Errorf("target directory does not exist: %s", targetDir)
+	if generateAll && len(args) > 0 {
+		return fmt.Errorf("--all does not take a path argument")
 	}
 
 	dataDir, err := config.DataDir()
@@ -71,11 +74,51 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	if dryRun {
-		printDryRun(cmd, targetDir, result, ws)
+		targetDir := args[0]
+		abs, err := filepath.Abs(targetDir)
+		if err != nil {
+			return fmt.Errorf("resolving target path: %w", err)
+		}
+		printDryRun(cmd, abs, result, ws)
 		return nil
 	}
 
+	if generateAll {
+		paths, err := registry.ReadAll(fsys, dataDir)
+		if err != nil {
+			return fmt.Errorf("reading projects registry: %w", err)
+		}
+		if len(paths) == 0 {
+			return fmt.Errorf("no projects tracked — run devkit generate <path> first")
+		}
+
+		templateDir := filepath.Join(dataDir, "templates")
+		for _, p := range paths {
+			if _, err := os.Stat(p); os.IsNotExist(err) {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  skipping missing dir: %s\n", p)
+				continue
+			}
+			if err := generateToPath(cmd, fsys, dataDir, ws, result, p, templateDir); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	targetDir, err := filepath.Abs(args[0])
+	if err != nil {
+		return fmt.Errorf("resolving target path: %w", err)
+	}
+
+	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+		return fmt.Errorf("target directory does not exist: %s", targetDir)
+	}
+
 	templateDir := filepath.Join(dataDir, "templates")
+	return generateToPath(cmd, fsys, dataDir, ws, result, targetDir, templateDir)
+}
+
+func generateToPath(cmd *cobra.Command, fsys dkfs.FS, dataDir string, ws *config.Workspace, result *composer.Result, targetDir, templateDir string) error {
 	genResult, err := generator.Generate(fsys, targetDir, result.Content, ws, templateDir)
 	if err != nil {
 		return err
@@ -85,7 +128,8 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  Overwriting: %s\n", strings.Join(genResult.Overwritten, ", "))
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), `✓ Generated %d files in %s:
+	if !quiet {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), `✓ Generated %d files in %s:
   %s
 
   Context: %s (from %s/contexts/%s.md)
@@ -93,11 +137,38 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
   ⚠ These files contain your private context. Add to .gitignore if repo is public.
 `, len(genResult.Written), targetDir,
-		strings.Join(genResult.Written, ", "),
-		ws.ActiveContext, dataDir, ws.ActiveContext,
-		float64(result.Size)/1024.0)
+			strings.Join(genResult.Written, ", "),
+			ws.ActiveContext, dataDir, ws.ActiveContext,
+			float64(result.Size)/1024.0)
+	}
+
+	// Register the path in projects.txt.
+	if err := registry.Append(fsys, dataDir, targetDir); err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  warning: could not update projects registry: %v\n", err)
+	}
+
+	// Write to ~/.claude/skills/devkit-context.md if the directory exists.
+	writeSkillsFile(cmd, result.Content)
 
 	return nil
+}
+
+func writeSkillsFile(cmd *cobra.Command, content string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	skillsDir := filepath.Join(home, ".claude", "skills")
+	if _, err := os.Stat(skillsDir); err != nil {
+		return // directory doesn't exist, skip silently
+	}
+	skillsPath := filepath.Join(skillsDir, "devkit-context.md")
+	if err := os.WriteFile(skillsPath, []byte(content), 0644); err != nil {
+		return // skip silently on error
+	}
+	if !quiet {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  ↳ also wrote ~/.claude/skills/devkit-context.md\n")
+	}
 }
 
 func printDryRun(cmd *cobra.Command, targetDir string, result *composer.Result, ws *config.Workspace) {
@@ -107,7 +178,10 @@ func printDryRun(cmd *cobra.Command, targetDir string, result *composer.Result, 
 		preview = preview[:20]
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Would generate %d files in %s:\n\n", len(generator.MarkdownTargets), targetDir)
+	allTargets := append(generator.MarkdownTargets, ws.ExtraTargets...)
+	allTargets = append(allTargets, generator.MDCTargets...)
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Would generate %d files in %s:\n\n", len(allTargets), targetDir)
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "--- CLAUDE.md (preview) ---\n")
 	for _, line := range preview {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n", line)
@@ -117,5 +191,5 @@ func printDryRun(cmd *cobra.Command, targetDir string, result *composer.Result, 
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nTotal: %.1fKB | Files: %s\n",
 		float64(result.Size)/1024.0,
-		strings.Join(generator.MarkdownTargets, ", "))
+		strings.Join(allTargets, ", "))
 }

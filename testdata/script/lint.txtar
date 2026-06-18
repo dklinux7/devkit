@@ -1,0 +1,10 @@
+# devkit lint passes on fresh init
+env DEVKIT_HOME=$WORK/devkit-home
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit lint
+stdout '0 error'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

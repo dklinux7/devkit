@@ -1,0 +1,13 @@
+# devkit diff shows unchanged when content matches
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project
+exec devkit diff $WORK/project
+stdout 'unchanged'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

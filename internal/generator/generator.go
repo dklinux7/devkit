@@ -19,6 +19,12 @@ var MarkdownTargets = []string{
 	".github/copilot-instructions.md",
 }
 
+var MDCTargets = []string{
+	".cursor/rules/devkit-context.mdc",
+}
+
+const mdcFrontmatter = "---\ndescription: devkit identity and context\nalwaysApply: true\n---\n\n"
+
 var StructuredTargets = []string{
 	"opencode.json",
 	".claude/settings.json",
@@ -37,7 +43,9 @@ type TemplateData struct {
 func Generate(fsys fs.FS, targetDir string, content string, ws *config.Workspace, templateDir string) (*Result, error) {
 	r := &Result{}
 
-	for _, name := range MarkdownTargets {
+	allMarkdownTargets := append(MarkdownTargets, ws.ExtraTargets...)
+
+	for _, name := range allMarkdownTargets {
 		path := filepath.Join(targetDir, name)
 		if fsys.Exists(path) {
 			existing, err := fsys.ReadFile(path)
@@ -49,6 +57,24 @@ func Generate(fsys fs.FS, targetDir string, content string, ws *config.Workspace
 			return nil, err
 		}
 		if err := fsys.WriteFile(path, []byte(content), 0644); err != nil {
+			return nil, fmt.Errorf("writing %s: %w", name, err)
+		}
+		r.Written = append(r.Written, name)
+	}
+
+	mdcContent := mdcFrontmatter + content
+	for _, name := range MDCTargets {
+		path := filepath.Join(targetDir, name)
+		if fsys.Exists(path) {
+			existing, err := fsys.ReadFile(path)
+			if err == nil && string(existing) != mdcContent {
+				r.Overwritten = append(r.Overwritten, name)
+			}
+		}
+		if err := ensureParentDir(fsys, path); err != nil {
+			return nil, err
+		}
+		if err := fsys.WriteFile(path, []byte(mdcContent), 0644); err != nil {
 			return nil, fmt.Errorf("writing %s: %w", name, err)
 		}
 		r.Written = append(r.Written, name)

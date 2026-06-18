@@ -256,6 +256,18 @@ type TemplateData struct {
 
 ---
 
+### `internal/registry`
+
+Manages `~/.devkit/projects.txt` — one absolute path per line.
+
+**`Append(fsys fs.FS, dataDir, targetPath string) error`**
+Adds `targetPath` to `projects.txt` if not already present.
+
+**`ReadAll(fsys fs.FS, dataDir string) ([]string, error)`**
+Returns all paths. Missing file returns empty slice, not error.
+
+---
+
 ### `internal/search`
 
 Searches all markdown files under `dataDir` for a query string.
@@ -309,6 +321,29 @@ Prompts for `yes` confirmation via `bufio.Scanner` on `os.Stdin`, then calls `os
 ### `search.go`
 
 Calls `config.DataDir()`, then `search.Search()`, then prints `file:line: text` results.
+
+Flags: `--interactive`. When set, pipes results to `fzf` if on PATH, otherwise falls back to `go-fuzzyfinder`.
+
+### `status.go`
+
+Shows sync state for all tracked projects from `projects.txt`. Compares composed content to `CLAUDE.md` on disk.
+States: `✓ in-sync`, `✗ stale`, `⚠ not generated`, `? missing`.
+
+### `diff.go`
+
+Shows what `devkit generate` would change for a given path. Flags: `--check` (exit 1 if any files would change, for CI).
+
+### `context.go`
+
+`devkit context ls` — lists contexts in `~/.devkit/contexts/` with size and last-modified date. Marks active context.
+
+### `doctor.go`
+
+`devkit doctor` — mtime-based stale check. Compares mtime of identity/context sources to `CLAUDE.md` in each tracked project.
+
+### `lint.go`
+
+`devkit lint` — validates `~/.devkit/` source files. Checks workspace.yaml required fields, active context exists, identity files present, file sizes, unexpanded `${VAR}` patterns, and estimated composed size.
 
 ---
 

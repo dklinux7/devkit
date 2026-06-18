@@ -1,0 +1,13 @@
+# devkit status shows in-sync for freshly generated project
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate $WORK/project
+exec devkit status
+stdout 'in-sync'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

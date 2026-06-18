@@ -4,7 +4,7 @@ env DEVKIT_HOME=$WORK/devkit-home
 exec devkit init
 
 stdin $WORK/no.txt
-exec devkit reset
+exec devkit reset --hard
 stdout 'Aborted'
 ! stdout '✓ Created'
 

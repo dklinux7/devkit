@@ -5,7 +5,7 @@ mkdir $WORK/project
 exec devkit init
 cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
 exec devkit generate $WORK/project
-stdout '✓ Generated 6 files'
+stdout '✓ Generated 7 files'
 stdout 'CLAUDE.md'
 stdout 'AGENTS.md'
 stdout 'GEMINI.md'

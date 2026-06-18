@@ -585,16 +585,24 @@ Note: `Glob` needed for `identity/*` file discovery. `embed` directives use `//g
 - [x] `docs/setup/github-multi-account.md`
 
 ### Milestone 2.5: Plug and play + quality of life
-- [ ] `extra_targets` in workspace.yaml — user-defined additional output files, merged with defaults in generator
-- [ ] `~/.devkit/projects.txt` registry — append on every `devkit generate`, read by `--all`
-- [ ] `devkit generate --all` — regenerate all tracked project paths
-- [ ] `devkit doctor` — compare mtime of identity/context sources vs generated files, print stale projects
-- [ ] `devkit context ls` — list contexts/ with size + last-modified date
-- [ ] `devkit search --interactive` — fzf via exec.LookPath, go-fuzzyfinder as fallback
+- [x] `extra_targets` in workspace.yaml — user-defined additional output files, merged with defaults in generator
+- [x] `~/.devkit/projects.txt` registry — append on every `devkit generate`, read by `--all`
+- [x] `devkit generate --all` — regenerate all tracked project paths
+- [x] `devkit doctor` — compare mtime of identity/context sources vs generated files, print stale projects
+- [x] `devkit context ls` — list contexts/ with size + last-modified date
+- [x] `devkit search --interactive` — fzf via exec.LookPath, go-fuzzyfinder as fallback
 - [ ] `devkit sync` — git pull/push wrapper on ~/.devkit/
 - [ ] `.mcp.json` generation — parse `mcp_servers` from context frontmatter, render to project
-- [ ] `GEMINI.md` added to default markdown targets
-- [ ] `docs/setup/new-machine.md` — private git repo for ~/.devkit/ + mise setup guide
+- [x] `GEMINI.md` added to default markdown targets
+- [x] `docs/setup/new-machine.md` — private git repo for ~/.devkit/ + mise setup guide
+- [x] Atomic writes in generator (write to .devkit-tmp then rename)
+- [x] `.cursor/rules/devkit-context.mdc` generation with Cursor frontmatter
+- [x] `devkit status` — sync state for all tracked projects
+- [x] `devkit diff <path>` + `--check` — CI integration for "forgot to regenerate"
+- [x] Non-destructive `devkit reset` (default) + `--hard` for old behavior
+- [x] `devkit lint` — source file validator
+- [x] `devkit generate --quiet` and `--all` flags
+- [x] `~/.claude/skills/devkit-context.md` output (hedge against SKILL.md ecosystem)
 
 ### Milestone 3: Archive + backup (when findings > 50)
 - [ ] Summarizer interface (Manual + Claude implementations)
