@@ -720,6 +720,15 @@ Tools researched and evaluated for use alongside devkit. Decisions are final unl
 | **mise** (jdx/mise, 29k★, MIT) | Document as companion | Runtime version management | Best cross-platform tool version manager. Full Windows native support. Bus factor caveat: Jeff Dickey is ~85% of commits, funded solo project. Windows env var injection requires `mise x` or shim mode (not transparent activation). |
 | **age** (FiloSottile/age, 22k★, BSD-3-Clause) | Milestone 3 only | `devkit backup` encryption | `filippo.io/age` Go library embeds cleanly (~30 lines). Use public key mode (not passphrase) for backup. Optional `backup_recipient` field in workspace.yaml. OS disk encryption is sufficient for normal ~/.devkit/ use. |
 | **private git repo** | Document as companion | ~/.devkit/ multi-machine sync | Simplest solution — no extra tool. `devkit sync` (v2) wraps git pull/push to make it discoverable. chezmoi is overkill for plain markdown files. |
+| **atuin** (atuinsh/atuin, 25k★, MIT) | Optional companion | Shell history replacement | SQLite-backed, searchable by directory/exit code/hostname/time. `Ctrl+R` that actually works. Optional sync across machines. `brew install atuin`. Pairs naturally with devkit's multi-machine setup. |
+| **zoxide** (ajeetdsouza/zoxide, 25k★, MIT) | Optional companion | `cd` replacement | Learns most-visited dirs. `z proj` jumps to `~/dev/work/project` after first visit. Directly complements the `~/dev/` workspace layout in this design doc. |
+| **starship** (starship-rs/starship, 47k★, ISC) | Optional companion | Cross-shell prompt | Shows git branch, language version, exit code. Instant visual feedback. Rust binary, works on macOS/Linux/Windows. Less setup than Powerlevel10k. |
+| **bat** (sharkdp/bat, 49k★, MIT/Apache) | Optional companion | `cat` replacement | Syntax highlighting + line numbers + git diff markers. Useful when reviewing generated CLAUDE.md files. `brew install bat`. |
+| **ast-grep** (ast-grep/ast-grep, 8k★, MIT) | Optional companion | Structural code search | Finds/replaces code patterns using AST, not regex — works regardless of formatting. Useful for cross-repo analysis in `~/dev/readonly/`. |
+| **difftastic** (wilfred/difftastic, 21k★, MIT) | Optional companion | Structural diff | Diffs by language syntax (Go structs, function boundaries) instead of raw lines. Drop-in `git diff` replacement for code review. |
+| **lazygit** (jesseduffield/lazygit, 57k★, MIT) | Optional companion | Terminal git UI | Fast commits, rebases, interactive staging — keyboard-driven. Reduces git command surface overhead. `brew install lazygit`. |
+| **just** (casey/just, 22k★, CC0) | Optional companion | Personal task runner | Better Make syntax for a global `~/.justfile` of personal shortcuts (start-day, sync-all, etc.). Note: rejected for *this* project (Makefile is sufficient); recommended as a global personal tool only. |
+| **viddy** (sachaos/viddy, 4k★, MIT) | Optional companion | Modern `watch` replacement | Shows diffs between refreshes, supports pause/rewind. Useful for watching `devkit status` output while editing `~/.devkit/` files. |
 
 ---
 
