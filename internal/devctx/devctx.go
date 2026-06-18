@@ -15,10 +15,11 @@ func StripFrontmatter(content []byte) []byte {
 }
 
 type Sources struct {
-	Identity [][]byte
-	Context  []byte
-	Donts    []byte
-	Lessons  [][]byte
+	Identity   [][]byte
+	Context    []byte
+	RawContext []byte
+	Donts      []byte
+	Lessons    [][]byte
 }
 
 func Load(fsys fs.FS, dataDir string, activeContext string, includeLessons bool) (*Sources, error) {
@@ -42,6 +43,7 @@ func Load(fsys fs.FS, dataDir string, activeContext string, includeLessons bool)
 		if err != nil {
 			return nil, err
 		}
+		s.RawContext = data
 		s.Context = StripFrontmatter(data)
 	} else {
 		ctxDir := filepath.Join(dataDir, "contexts", activeContext)

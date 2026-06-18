@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -98,7 +99,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  skipping missing dir: %s\n", p)
 				continue
 			}
-			if err := generateToPath(cmd, fsys, dataDir, ws, result, p, templateDir); err != nil {
+			if err := generateToPath(cmd, fsys, dataDir, ws, sources, result, p, templateDir); err != nil {
 				return err
 			}
 		}
@@ -115,13 +116,26 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	templateDir := filepath.Join(dataDir, "templates")
-	return generateToPath(cmd, fsys, dataDir, ws, result, targetDir, templateDir)
+	return generateToPath(cmd, fsys, dataDir, ws, sources, result, targetDir, templateDir)
 }
 
-func generateToPath(cmd *cobra.Command, fsys dkfs.FS, dataDir string, ws *config.Workspace, result *composer.Result, targetDir, templateDir string) error {
+func generateToPath(cmd *cobra.Command, fsys dkfs.FS, dataDir string, ws *config.Workspace, sources *devctx.Sources, result *composer.Result, targetDir, templateDir string) error {
 	genResult, err := generator.Generate(fsys, targetDir, result.Content, ws, templateDir)
 	if err != nil {
 		return err
+	}
+
+	if mcpJSON := buildMCPJSON(sources); mcpJSON != "" {
+		mcpPath := filepath.Join(targetDir, ".mcp.json")
+		if fsys.Exists(mcpPath) {
+			existing, _ := fsys.ReadFile(mcpPath)
+			if string(existing) != mcpJSON {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  Overwriting: .mcp.json\n")
+			}
+		}
+		if err := fsys.WriteFile(mcpPath, []byte(mcpJSON), 0600); err != nil {
+			return fmt.Errorf("writing .mcp.json: %w", err)
+		}
 	}
 
 	if len(genResult.Overwritten) > 0 {
@@ -169,6 +183,37 @@ func writeSkillsFile(cmd *cobra.Command, content string) {
 	if !quiet {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  ↳ also wrote ~/.claude/skills/devkit-context.md\n")
 	}
+}
+
+func buildMCPJSON(sources *devctx.Sources) string {
+	servers := devctx.ParseMCPServers(sources.RawContext)
+	if len(servers) == 0 {
+		return ""
+	}
+
+	type serverEntry struct {
+		Command string            `json:"command"`
+		Args    []string          `json:"args,omitempty"`
+		Env     map[string]string `json:"env,omitempty"`
+	}
+	type mcpConfig struct {
+		MCPServers map[string]serverEntry `json:"mcpServers"`
+	}
+
+	cfg := mcpConfig{MCPServers: make(map[string]serverEntry)}
+	for name, srv := range servers {
+		cfg.MCPServers[name] = serverEntry{
+			Command: srv.Command,
+			Args:    srv.Args,
+			Env:     srv.Env,
+		}
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(data) + "\n"
 }
 
 func printDryRun(cmd *cobra.Command, targetDir string, result *composer.Result, ws *config.Workspace) {
