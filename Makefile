@@ -4,7 +4,7 @@ BINARY := devkit
 CMD := .
 
 build:
-	CGO_ENABLED=0 go build -o $(BINARY) $(CMD)
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(BINARY) $(CMD)
 
 install:
 	CGO_ENABLED=0 go install $(CMD)

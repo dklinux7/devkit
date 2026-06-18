@@ -10,9 +10,10 @@ import (
 )
 
 type Workspace struct {
-	Name          string   `yaml:"name"`
-	ActiveContext string   `yaml:"active_context"`
-	ExtraTargets  []string `yaml:"extra_targets"`
+	Name            string   `yaml:"name"`
+	ActiveContext   string   `yaml:"active_context"`
+	ExtraTargets    []string `yaml:"extra_targets"`
+	BackupRecipient string   `yaml:"backup_recipient"`
 }
 
 func DataDir() (string, error) {
