@@ -1,6 +1,8 @@
 package devctx
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -22,6 +24,15 @@ type Sources struct {
 }
 
 func Load(fsys fs.FS, dataDir string, activeContext string, includeLessons bool) (*Sources, error) {
+	if strings.Contains(activeContext, "..") || filepath.IsAbs(activeContext) {
+		return nil, fmt.Errorf("invalid active_context %q: must be a simple name", activeContext)
+	}
+	contextsDir := filepath.Join(dataDir, "contexts")
+	ctxPath := filepath.Join(contextsDir, activeContext+".md")
+	if !strings.HasPrefix(filepath.Clean(ctxPath), filepath.Clean(contextsDir)+string(os.PathSeparator)) {
+		return nil, fmt.Errorf("active_context %q escapes contexts directory", activeContext)
+	}
+
 	s := &Sources{}
 
 	identityFiles, err := fsys.Glob(filepath.Join(dataDir, "identity", "*.md"))
@@ -36,7 +47,6 @@ func Load(fsys fs.FS, dataDir string, activeContext string, includeLessons bool)
 		s.Identity = append(s.Identity, StripFrontmatter(data))
 	}
 
-	ctxPath := filepath.Join(dataDir, "contexts", activeContext+".md")
 	if fsys.Exists(ctxPath) {
 		data, err := fsys.ReadFile(ctxPath)
 		if err != nil {

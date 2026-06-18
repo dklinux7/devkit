@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -14,16 +15,19 @@ var MarkdownTargets = []string{
 	"CLAUDE.md",
 	"AGENTS.md",
 	"GEMINI.md",
+	"CONVENTIONS.md",
 	".cursorrules",
 	".windsurfrules",
 	".github/copilot-instructions.md",
+	".claude/rules/devkit-context.md",
+	".kiro/steering/identity.md",
 }
 
 var MDCTargets = []string{
 	".cursor/rules/devkit-context.mdc",
 }
 
-const mdcFrontmatter = "---\ndescription: devkit identity and context\nalwaysApply: true\n---\n\n"
+const MDCFrontmatter = "---\ndescription: devkit identity and context\nalwaysApply: true\n---\n\n"
 
 var StructuredTargets = []string{
 	"opencode.json",
@@ -43,10 +47,18 @@ type TemplateData struct {
 func Generate(fsys fs.FS, targetDir string, content string, ws *config.Workspace, templateDir string) (*Result, error) {
 	r := &Result{}
 
-	allMarkdownTargets := append(MarkdownTargets, ws.ExtraTargets...)
+	cleanTarget := filepath.Clean(targetDir)
+
+	allMarkdownTargets := make([]string, 0, len(MarkdownTargets)+len(ws.ExtraTargets))
+	allMarkdownTargets = append(allMarkdownTargets, MarkdownTargets...)
+	allMarkdownTargets = append(allMarkdownTargets, ws.ExtraTargets...)
 
 	for _, name := range allMarkdownTargets {
 		path := filepath.Join(targetDir, name)
+		resolved := filepath.Clean(path)
+		if !strings.HasPrefix(resolved, cleanTarget+string(os.PathSeparator)) && resolved != cleanTarget {
+			return nil, fmt.Errorf("target %q escapes target directory", name)
+		}
 		if fsys.Exists(path) {
 			existing, err := fsys.ReadFile(path)
 			if err == nil && string(existing) != content {
@@ -62,9 +74,13 @@ func Generate(fsys fs.FS, targetDir string, content string, ws *config.Workspace
 		r.Written = append(r.Written, name)
 	}
 
-	mdcContent := mdcFrontmatter + content
+	mdcContent := MDCFrontmatter + content
 	for _, name := range MDCTargets {
 		path := filepath.Join(targetDir, name)
+		resolved := filepath.Clean(path)
+		if !strings.HasPrefix(resolved, cleanTarget+string(os.PathSeparator)) && resolved != cleanTarget {
+			return nil, fmt.Errorf("target %q escapes target directory", name)
+		}
 		if fsys.Exists(path) {
 			existing, err := fsys.ReadFile(path)
 			if err == nil && string(existing) != mdcContent {
@@ -101,6 +117,10 @@ func Generate(fsys fs.FS, targetDir string, content string, ws *config.Workspace
 		}
 
 		path := filepath.Join(targetDir, name)
+		resolved := filepath.Clean(path)
+		if !strings.HasPrefix(resolved, cleanTarget+string(os.PathSeparator)) && resolved != cleanTarget {
+			return nil, fmt.Errorf("target %q escapes target directory", name)
+		}
 		rendered := buf.String()
 		if fsys.Exists(path) {
 			existing, err := fsys.ReadFile(path)

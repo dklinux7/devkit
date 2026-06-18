@@ -5,7 +5,7 @@ mkdir $WORK/project
 exec devkit init
 cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
 exec devkit generate --dry-run $WORK/project
-stdout 'Would generate 7 files'
+stdout 'Would generate 10 files'
 stdout 'CLAUDE.md'
 
 ! exists $WORK/project/CLAUDE.md

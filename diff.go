@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dklinux7/devkit/internal/composer"
-	"github.com/dklinux7/devkit/internal/config"
-	"github.com/dklinux7/devkit/internal/devctx"
-	dkfs "github.com/dklinux7/devkit/internal/fs"
 	"github.com/dklinux7/devkit/internal/generator"
 	"github.com/spf13/cobra"
 )
@@ -32,24 +28,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving target path: %w", err)
 	}
 
-	dataDir, err := config.DataDir()
-	if err != nil {
-		return err
-	}
-
-	fsys := dkfs.NewOsFS()
-
-	ws, err := config.Load(fsys, dataDir)
-	if err != nil {
-		return err
-	}
-
-	sources, err := devctx.Load(fsys, dataDir, ws.ActiveContext, false)
-	if err != nil {
-		return fmt.Errorf("loading context: %w", err)
-	}
-
-	result, err := composer.Compose(sources, true)
+	cc, err := resolveComposed(false, true)
 	if err != nil {
 		return err
 	}
@@ -62,20 +41,20 @@ func runDiff(cmd *cobra.Command, args []string) error {
 
 	var targets []targetCheck
 	for _, name := range generator.MarkdownTargets {
-		targets = append(targets, targetCheck{name: name, content: result.Content})
+		targets = append(targets, targetCheck{name: name, content: cc.result.Content})
 	}
-	for _, name := range ws.ExtraTargets {
-		targets = append(targets, targetCheck{name: name, content: result.Content})
+	for _, name := range cc.ws.ExtraTargets {
+		targets = append(targets, targetCheck{name: name, content: cc.result.Content})
 	}
-	mdcContent := "---\ndescription: devkit identity and context\nalwaysApply: true\n---\n\n" + result.Content
+	mdcContent := generator.MDCFrontmatter + cc.result.Content
 	for _, name := range generator.MDCTargets {
 		targets = append(targets, targetCheck{name: name, content: mdcContent})
 	}
 
-	templateDir := filepath.Join(dataDir, "templates")
+	templateDir := filepath.Join(cc.dataDir, "templates")
 	for _, name := range generator.StructuredTargets {
 		tmplPath := filepath.Join(templateDir, name+".tmpl")
-		if fsys.Exists(tmplPath) {
+		if cc.fsys.Exists(tmplPath) {
 			targets = append(targets, targetCheck{name: name, content: ""}) // content checked separately
 		}
 	}
@@ -91,13 +70,13 @@ func runDiff(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		if !fsys.Exists(path) {
+		if !cc.fsys.Exists(path) {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✗ %s (would create: %s)\n", tc.name, formatSize(len(tc.content)))
 			wouldChange++
 			continue
 		}
 
-		existing, err := fsys.ReadFile(path)
+		existing, err := cc.fsys.ReadFile(path)
 		if err != nil {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✗ %s (would change: unreadable → %s)\n", tc.name, formatSize(len(tc.content)))
 			wouldChange++
@@ -116,7 +95,7 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	// Also flag structured targets without templates.
 	for _, name := range generator.StructuredTargets {
 		tmplPath := filepath.Join(templateDir, name+".tmpl")
-		if !fsys.Exists(tmplPath) {
+		if !cc.fsys.Exists(tmplPath) {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "- %s (no template)\n", name)
 		}
 	}

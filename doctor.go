@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dklinux7/devkit/internal/config"
-	dkfs "github.com/dklinux7/devkit/internal/fs"
 	"github.com/dklinux7/devkit/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -22,14 +20,7 @@ func init() {
 }
 
 func runDoctor(cmd *cobra.Command, args []string) error {
-	dataDir, err := config.DataDir()
-	if err != nil {
-		return err
-	}
-
-	fsys := dkfs.NewOsFS()
-
-	ws, err := config.Load(fsys, dataDir)
+	cc, err := resolveComposed(false, true)
 	if err != nil {
 		return err
 	}
@@ -37,12 +28,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Gather source file mtimes.
 	sourceMtime := time.Time{}
 
-	identityFiles, err := fsys.Glob(filepath.Join(dataDir, "identity", "*.md"))
+	identityFiles, err := cc.fsys.Glob(filepath.Join(cc.dataDir, "identity", "*.md"))
 	if err != nil {
 		return fmt.Errorf("reading identity/: %w", err)
 	}
 	for _, f := range identityFiles {
-		info, err := fsys.Stat(f)
+		info, err := cc.fsys.Stat(f)
 		if err != nil {
 			continue
 		}
@@ -52,19 +43,19 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Context mtime.
-	ctxPath := filepath.Join(dataDir, "contexts", ws.ActiveContext+".md")
-	if fsys.Exists(ctxPath) {
-		info, err := fsys.Stat(ctxPath)
+	ctxPath := filepath.Join(cc.dataDir, "contexts", cc.ws.ActiveContext+".md")
+	if cc.fsys.Exists(ctxPath) {
+		info, err := cc.fsys.Stat(ctxPath)
 		if err == nil && info.ModTime().After(sourceMtime) {
 			sourceMtime = info.ModTime()
 		}
 	} else {
-		ctxDir := filepath.Join(dataDir, "contexts", ws.ActiveContext)
-		if fsys.Exists(ctxDir) {
-			ctxFiles, err := fsys.Glob(filepath.Join(ctxDir, "*.md"))
+		ctxDir := filepath.Join(cc.dataDir, "contexts", cc.ws.ActiveContext)
+		if cc.fsys.Exists(ctxDir) {
+			ctxFiles, err := cc.fsys.Glob(filepath.Join(ctxDir, "*.md"))
 			if err == nil {
 				for _, f := range ctxFiles {
-					info, err := fsys.Stat(f)
+					info, err := cc.fsys.Stat(f)
 					if err == nil && info.ModTime().After(sourceMtime) {
 						sourceMtime = info.ModTime()
 					}
@@ -74,15 +65,15 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// donts.md mtime.
-	dontsPath := filepath.Join(dataDir, "donts.md")
-	if fsys.Exists(dontsPath) {
-		info, err := fsys.Stat(dontsPath)
+	dontsPath := filepath.Join(cc.dataDir, "donts.md")
+	if cc.fsys.Exists(dontsPath) {
+		info, err := cc.fsys.Stat(dontsPath)
 		if err == nil && info.ModTime().After(sourceMtime) {
 			sourceMtime = info.ModTime()
 		}
 	}
 
-	paths, err := registry.ReadAll(fsys, dataDir)
+	paths, err := registry.ReadAll(cc.fsys, cc.dataDir)
 	if err != nil {
 		return fmt.Errorf("reading projects registry: %w", err)
 	}
@@ -94,20 +85,20 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	var allGood = true
 
 	for _, p := range paths {
-		if !fsys.Exists(p) {
+		if !cc.fsys.Exists(p) {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "? missing       %s\n", p)
 			allGood = false
 			continue
 		}
 
 		claudeMD := filepath.Join(p, "CLAUDE.md")
-		if !fsys.Exists(claudeMD) {
+		if !cc.fsys.Exists(claudeMD) {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "⚠ not generated  %s\n", p)
 			allGood = false
 			continue
 		}
 
-		info, err := fsys.Stat(claudeMD)
+		info, err := cc.fsys.Stat(claudeMD)
 		if err != nil {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "⚠ unreadable     %s\n", p)
 			allGood = false

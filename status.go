@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dklinux7/devkit/internal/composer"
-	"github.com/dklinux7/devkit/internal/config"
-	"github.com/dklinux7/devkit/internal/devctx"
-	dkfs "github.com/dklinux7/devkit/internal/fs"
 	"github.com/dklinux7/devkit/internal/registry"
 	"github.com/spf13/cobra"
 )
@@ -23,29 +19,12 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	dataDir, err := config.DataDir()
+	ctx, err := resolveComposed(false, true)
 	if err != nil {
 		return err
 	}
 
-	fsys := dkfs.NewOsFS()
-
-	ws, err := config.Load(fsys, dataDir)
-	if err != nil {
-		return err
-	}
-
-	sources, err := devctx.Load(fsys, dataDir, ws.ActiveContext, false)
-	if err != nil {
-		return fmt.Errorf("loading context: %w", err)
-	}
-
-	result, err := composer.Compose(sources, true)
-	if err != nil {
-		return err
-	}
-
-	paths, err := registry.ReadAll(fsys, dataDir)
+	paths, err := registry.ReadAll(ctx.fsys, ctx.dataDir)
 	if err != nil {
 		return fmt.Errorf("reading projects registry: %w", err)
 	}
@@ -57,27 +36,27 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	var inSync, stale, missing int
 
 	for _, p := range paths {
-		if !fsys.Exists(p) {
+		if !ctx.fsys.Exists(p) {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "? missing       %s\n", p)
 			missing++
 			continue
 		}
 
 		claudeMD := filepath.Join(p, "CLAUDE.md")
-		if !fsys.Exists(claudeMD) {
+		if !ctx.fsys.Exists(claudeMD) {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "⚠ not generated  %s\n", p)
 			stale++
 			continue
 		}
 
-		existing, err := fsys.ReadFile(claudeMD)
+		existing, err := ctx.fsys.ReadFile(claudeMD)
 		if err != nil {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "⚠ not generated  %s\n", p)
 			stale++
 			continue
 		}
 
-		if string(existing) == result.Content {
+		if string(existing) == ctx.result.Content {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ in-sync    %s\n", p)
 			inSync++
 		} else {

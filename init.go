@@ -30,7 +30,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s already exists — remove it first to re-initialize", dataDir)
 	}
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return fmt.Errorf("creating %s: %w", dataDir, err)
 	}
 
@@ -43,14 +43,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 		target := filepath.Join(dataDir, rel)
 
 		if d.IsDir() {
-			return os.MkdirAll(target, 0755)
+			return os.MkdirAll(target, 0700)
 		}
 
 		data, err := TemplateFS.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, 0644)
+		return os.WriteFile(target, data, 0600)
 	})
 	if err != nil {
 		return fmt.Errorf("scaffolding templates: %w", err)

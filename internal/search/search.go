@@ -25,7 +25,7 @@ func Search(fsys fs.FS, dataDir string, query string) ([]Match, error) {
 }
 
 func searchRipgrep(rgPath string, dataDir string, query string) ([]Match, error) {
-	cmd := exec.Command(rgPath, "--line-number", "--no-heading", "--glob", "*.md", "--", query, dataDir)
+	cmd := exec.Command(rgPath, "--line-number", "--no-heading", "--ignore-case", "--glob", "*.md", "--", query, dataDir)
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {

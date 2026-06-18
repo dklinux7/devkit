@@ -115,7 +115,7 @@ func runInitMissing(cmd *cobra.Command, dataDir string, fsys dkfs.FS) error {
 		target := filepath.Join(dataDir, rel)
 
 		if d.IsDir() {
-			return os.MkdirAll(target, 0755)
+			return os.MkdirAll(target, 0700)
 		}
 
 		// Skip if file already exists.
@@ -127,6 +127,6 @@ func runInitMissing(cmd *cobra.Command, dataDir string, fsys dkfs.FS) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, 0644)
+		return os.WriteFile(target, data, 0600)
 	})
 }

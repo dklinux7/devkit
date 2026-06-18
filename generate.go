@@ -40,6 +40,9 @@ func init() {
 }
 
 func runGenerate(cmd *cobra.Command, args []string) error {
+	if dryRun && generateAll {
+		return fmt.Errorf("--dry-run and --all cannot be combined")
+	}
 	if !generateAll && len(args) != 1 {
 		return fmt.Errorf("requires exactly 1 argument (target path), or use --all")
 	}
@@ -148,26 +151,45 @@ func generateToPath(cmd *cobra.Command, fsys dkfs.FS, dataDir string, ws *config
 	}
 
 	// Write to ~/.claude/skills/devkit-context.md if the directory exists.
-	writeSkillsFile(cmd, result.Content)
+	writeSkillsFile(cmd, fsys, result.Content)
+
+	checkGitignore(cmd, targetDir)
 
 	return nil
 }
 
-func writeSkillsFile(cmd *cobra.Command, content string) {
+func writeSkillsFile(cmd *cobra.Command, fsys dkfs.FS, content string) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return
 	}
 	skillsDir := filepath.Join(home, ".claude", "skills")
-	if _, err := os.Stat(skillsDir); err != nil {
-		return // directory doesn't exist, skip silently
+	if !fsys.Exists(skillsDir) {
+		return
 	}
 	skillsPath := filepath.Join(skillsDir, "devkit-context.md")
-	if err := os.WriteFile(skillsPath, []byte(content), 0644); err != nil {
-		return // skip silently on error
+	if err := fsys.WriteFile(skillsPath, []byte(content), 0600); err != nil {
+		return
 	}
 	if !quiet {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  ↳ also wrote ~/.claude/skills/devkit-context.md\n")
+	}
+}
+
+func checkGitignore(cmd *cobra.Command, targetDir string) {
+	gitDir := filepath.Join(targetDir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return
+	}
+	gitignore := filepath.Join(targetDir, ".gitignore")
+	data, err := os.ReadFile(gitignore)
+	if err != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  ⚠ No .gitignore found — generated files contain private context. Add CLAUDE.md, AGENTS.md, etc. to .gitignore if this repo is public.\n")
+		return
+	}
+	content := string(data)
+	if !strings.Contains(content, "CLAUDE.md") && !strings.Contains(content, "AGENTS.md") {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  ⚠ Generated files are not in .gitignore — they contain private context. Consider adding CLAUDE.md, AGENTS.md, .cursorrules, etc.\n")
 	}
 }
 
@@ -178,7 +200,9 @@ func printDryRun(cmd *cobra.Command, targetDir string, result *composer.Result, 
 		preview = preview[:20]
 	}
 
-	allTargets := append(generator.MarkdownTargets, ws.ExtraTargets...)
+	allTargets := make([]string, 0, len(generator.MarkdownTargets)+len(ws.ExtraTargets)+len(generator.MDCTargets))
+	allTargets = append(allTargets, generator.MarkdownTargets...)
+	allTargets = append(allTargets, ws.ExtraTargets...)
 	allTargets = append(allTargets, generator.MDCTargets...)
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Would generate %d files in %s:\n\n", len(allTargets), targetDir)
