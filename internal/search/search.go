@@ -101,7 +101,7 @@ func findMarkdownFiles(fsys fs.FS, dir string) ([]string, error) {
 	}
 
 	for _, e := range entries {
-		path := filepath.Join(dir, e.Name())
+		path := filepath.ToSlash(filepath.Join(dir, e.Name()))
 		if e.IsDir() {
 			sub, err := findMarkdownFiles(fsys, path)
 			if err != nil {
