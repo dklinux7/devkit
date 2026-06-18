@@ -17,7 +17,7 @@ devkit generate <path>
 ```
 
 **Module path:** `github.com/dklinux7/devkit`  
-**Go version:** 1.26.4 (see `go.mod`)  
+**Go version:** 1.26 (pinned in `mise.toml`; go.mod for toolchain constraints)  
 **Entry point:** `main.go` (root package)  
 **Binary name:** `devkit`
 
@@ -27,9 +27,18 @@ devkit generate <path>
 
 ```
 .
-├── main.go                    ← cobra root + run() entry point
+├── main.go                    ← cobra root, verbose flag, debugf(), run() entry point
 ├── init.go                    ← devkit init command
 ├── generate.go                ← devkit generate command
+├── compose_helper.go          ← resolveComposed() shared helper + composedContext struct
+├── status.go                  ← devkit status command
+├── doctor.go                  ← devkit doctor command
+├── diff.go                    ← devkit diff command
+├── lint.go                    ← devkit lint command
+├── context.go                 ← devkit context ls command
+├── sync.go                    ← devkit sync command
+├── version.go                 ← devkit version command
+├── untrack.go                 ← devkit untrack command
 ├── reset.go                   ← devkit reset command
 ├── search.go                  ← devkit search command
 ├── e2e_test.go                ← testscript TestMain + TestScript
@@ -37,12 +46,15 @@ devkit generate <path>
 ├── internal/
 │   ├── fs/                    ← filesystem abstraction
 │   │   ├── fs.go              ← FS interface
-│   │   ├── osfs.go            ← real OS implementation
+│   │   ├── osfs.go            ← real OS implementation (atomic write via rename)
 │   │   └── memfs.go           ← in-memory implementation (tests only)
 │   ├── config/                ← workspace.yaml loading + data dir resolution
-│   ├── devctx/                ← loads identity, context, donts, lessons
+│   ├── devctx/                ← loads identity, context, donts, lessons; parses MCP servers
+│   │   ├── devctx.go
+│   │   └── mcpservers.go
 │   ├── composer/              ← concatenates sources into one blob
 │   ├── generator/             ← writes output files to target directory
+│   ├── registry/              ← reads/writes ~/.devkit/projects.txt
 │   └── search/                ← searches markdown files (ripgrep + native fallback)
 │
 ├── templates/                 ← embedded scaffold files (go:embed all:templates)
@@ -61,7 +73,8 @@ devkit generate <path>
 │   ├── developer.md           ← this file
 │   ├── testing.md             ← how to run/write/debug tests
 │   └── setup/
-│       └── github-multi-account.md
+│       ├── github-multi-account.md
+│       └── new-machine.md
 │
 ├── .github/
 │   ├── workflows/
@@ -72,6 +85,7 @@ devkit generate <path>
 │
 ├── .goreleaser.yaml
 ├── Makefile
+├── mise.toml                  ← pins Go and golangci-lint versions for local dev
 ├── go.mod
 └── go.sum
 ```
@@ -89,14 +103,16 @@ This is the core command. Every other command is simpler.
 2. config.Load(fsys, dataDir)
        → reads workspace.yaml
        → validates name + active_context are set
-       → returns *Workspace{Name, ActiveContext}
+       → returns *Workspace{Name, ActiveContext, ExtraTargets, BackupRecipient}
 
 3. devctx.Load(fsys, dataDir, activeContext, includeLessons)
+       → validates activeContext: rejects ".." and absolute paths
        → reads identity/*.md  (sorted glob, frontmatter stripped)
        → reads contexts/<active>.md  OR  contexts/<active>/*.md (folder context)
        → reads donts.md
        → optionally reads lessons/*.md
-       → returns *Sources{Identity [][]byte, Context []byte, Donts []byte, Lessons [][]byte}
+       → returns *Sources{Identity [][]byte, Context []byte, RawContext []byte, Donts []byte, Lessons [][]byte}
+       (RawContext is the raw bytes of the context file, used for MCP server extraction)
 
 4. composer.Compose(sources, force)
        → joins sections with \n\n in order: identity... → context → donts → lessons...
@@ -105,10 +121,25 @@ This is the core command. Every other command is simpler.
        → returns *Result{Content string, Size int, Warnings []string}
 
 5. generator.Generate(fsys, targetDir, content, ws, templateDir)
-       → writes content to every MarkdownTargets file
+       → writes content to every MarkdownTargets file (including ws.ExtraTargets)
+       → writes MDCFrontmatter + content to every MDCTargets file
        → for each StructuredTargets file, if a .tmpl exists in templateDir, renders and writes
+       → path traversal check: filepath.Clean(path) must have cleanTarget as prefix
        → tracks which files were overwritten (existed and differed)
        → returns *Result{Written []string, Overwritten []string}
+
+6. buildMCPJSON(sources)
+       → calls devctx.ParseMCPServers(sources.RawContext) to extract mcp_servers from context frontmatter
+       → if any servers found, marshals to JSON and writes .mcp.json in targetDir
+
+7. registry.Append(fsys, dataDir, targetDir)
+       → appends targetDir to ~/.devkit/projects.txt if not already present
+
+8. writeSkillsFile(cmd, fsys, content)
+       → if ~/.claude/skills/ exists, writes content to ~/.claude/skills/devkit-context.md
+
+9. checkGitignore(cmd, targetDir)
+       → if targetDir is a git repo, warns if CLAUDE.md/AGENTS.md are not in .gitignore
 ```
 
 **Composition order is intentional:** `donts.md` is last because LLMs weight end-of-prompt content more heavily.
@@ -133,8 +164,8 @@ type FS interface {
 }
 ```
 
-- **`NewOsFS()`** — wraps the real OS. Used in production code.
-- **`NewMemFS()`** — in-memory map. Used in all unit tests. Never touches disk.
+- **`NewOsFS()`** — wraps the real OS. `WriteFile` uses write-to-temp + rename for atomic writes. Used in production code.
+- **`NewMemFS()`** — in-memory map. Supports `ModTimes` for mtime-based tests. Used in all unit tests. Never touches disk.
 
 **Rule:** All `internal/` packages accept `fs.FS` as a parameter. No package calls `os.ReadFile` directly — they always go through the interface.
 
@@ -156,10 +187,14 @@ Loads `workspace.yaml` and resolves the data directory.
 **`Workspace` struct:**
 ```go
 type Workspace struct {
-    Name          string `yaml:"name"`
-    ActiveContext string `yaml:"active_context"`
+    Name            string   `yaml:"name"`
+    ActiveContext   string   `yaml:"active_context"`
+    ExtraTargets    []string `yaml:"extra_targets"`
+    BackupRecipient string   `yaml:"backup_recipient"`
 }
 ```
+
+`ExtraTargets` is a list of additional filenames to write during generate (same content as `MarkdownTargets`). `BackupRecipient` is reserved for Milestone 3 archive/backup.
 
 Adding a field to `workspace.yaml`: add it to the struct with a yaml tag. It becomes available in generator templates via `{{.Workspace.FieldName}}`. Add validation in `Load` if required.
 
@@ -171,24 +206,30 @@ Loads and prepares source content from `~/.devkit/`.
 
 **`Load(fsys fs.FS, dataDir, activeContext string, includeLessons bool) (*Sources, error)`**
 
+- **Validation:** Rejects `activeContext` containing `..` or that is absolute. Also verifies the resolved context path does not escape `contexts/` via `filepath.Clean` + `strings.HasPrefix`.
 - **Identity:** Glob `identity/*.md`, read each, strip frontmatter, append to `Sources.Identity` slice. Order is filesystem-sorted (alphabetical).
-- **Context (flat file):** Try `contexts/<activeContext>.md` first.
-- **Context (folder):** If the `.md` file doesn't exist, try `contexts/<activeContext>/` as a directory. Globs `*.md` inside it, concatenates with `\n\n`.
+- **Context (flat file):** Try `contexts/<activeContext>.md` first. Sets both `RawContext` (raw bytes) and `Context` (frontmatter stripped).
+- **Context (folder):** If the `.md` file doesn't exist, try `contexts/<activeContext>/` as a directory. Globs `*.md` inside it, concatenates stripped content with `\n\n`. `RawContext` is not set for folder contexts.
 - **Donts:** Reads `donts.md`. Missing file is not an error — `Sources.Donts` stays nil.
 - **Lessons:** Only loaded when `includeLessons=true`. Glob `lessons/*.md`.
 
 **`StripFrontmatter(content []byte) []byte`**  
-Strips YAML frontmatter (`---\n...\n---\n`) from the start of a file. Frontmatter is used for metadata (date, tags, company) but must not appear in generated AI config.
+Strips YAML frontmatter (`---\n...\n---\n`) from the start of a file. Frontmatter is used for metadata but must not appear in generated AI config.
 
 **`Sources` struct:**
 ```go
 type Sources struct {
-    Identity [][]byte  // one entry per identity/*.md file
-    Context  []byte    // composed from context file or folder
-    Donts    []byte
-    Lessons  [][]byte  // nil unless includeLessons=true
+    Identity   [][]byte  // one entry per identity/*.md file
+    Context    []byte    // composed from context file or folder (frontmatter stripped)
+    RawContext []byte    // raw bytes of the context file (for MCP extraction)
+    Donts      []byte
+    Lessons    [][]byte  // nil unless includeLessons=true
 }
 ```
+
+**`ParseMCPServers(content []byte) map[string]MCPServer`** (in `mcpservers.go`)
+
+Extracts the `mcp_servers` key from YAML frontmatter in the raw context file. Returns a map of server name → `MCPServer{Command, Args, Env}`. Used by `buildMCPJSON` in `generate.go` to produce `.mcp.json`.
 
 ---
 
@@ -218,15 +259,25 @@ Writes the composed content to the target project directory.
 **Target lists:**
 
 ```go
-// Always written — same content (the composed markdown blob)
+// Always written — same composed markdown content
 var MarkdownTargets = []string{
     "CLAUDE.md",
     "AGENTS.md",
     "GEMINI.md",
+    "CONVENTIONS.md",
     ".cursorrules",
     ".windsurfrules",
     ".github/copilot-instructions.md",
+    ".claude/rules/devkit-context.md",
+    ".kiro/steering/identity.md",
 }
+
+// Written with MDCFrontmatter prepended
+var MDCTargets = []string{
+    ".cursor/rules/devkit-context.mdc",
+}
+
+const MDCFrontmatter = "---\ndescription: devkit identity and context\nalwaysApply: true\n---\n\n"
 
 // Written only when a matching .tmpl file exists in templateDir
 var StructuredTargets = []string{
@@ -235,24 +286,31 @@ var StructuredTargets = []string{
 }
 ```
 
+`ws.ExtraTargets` from `workspace.yaml` are appended to the markdown targets list at generate time.
+
 **`Generate(fsys fs.FS, targetDir, content string, ws *config.Workspace, templateDir string) (*Result, error)`**
 
-1. For each `MarkdownTargets` entry: check if the file exists and differs (→ add to `Overwritten`), then call `ensureParentDir` + `WriteFile`.
-2. For each `StructuredTargets` entry: check if `<name>.tmpl` exists in `templateDir`. If yes, parse as `text/template`, execute with `TemplateData{Workspace, Content}`, write rendered output.
+1. For each markdown target (MarkdownTargets + ExtraTargets): validate path does not escape `targetDir` using `filepath.Clean` + `strings.HasPrefix`, then check if file exists and differs (→ add to `Overwritten`), call `ensureParentDir` + `WriteFile`.
+2. For each MDC target: same path validation, write `MDCFrontmatter + content`.
+3. For each StructuredTargets entry: check if `<name>.tmpl` exists in `templateDir`. If yes, parse as `text/template`, execute with `TemplateData{Workspace, Content}`, write rendered output.
+
+**Path traversal protection:** Every target path is resolved with `filepath.Clean` and checked to have `cleanTarget + os.PathSeparator` as a prefix. This prevents `extra_targets` or any other name from escaping the project directory.
 
 **`TemplateData` struct:**
 ```go
 type TemplateData struct {
-    Workspace *config.Workspace  // .Workspace.Name, .Workspace.ActiveContext
+    Workspace *config.Workspace  // .Workspace.Name, .Workspace.ActiveContext, etc.
     Content   string             // the full composed markdown blob
 }
 ```
 
 **Adding a new AI tool (markdown output):** Add its config filename to `MarkdownTargets`. No other changes needed.
 
-**Adding a new AI tool (structured/JSON/TOML output):** Add its filename to `StructuredTargets`, then add a `<filename>.tmpl` file in `templates/`. Use Go `text/template` syntax. Access workspace fields via `{{.Workspace.Name}}`.
+**Adding a new AI tool (MDC output):** Add its filename to `MDCTargets`. The `MDCFrontmatter` header is prepended automatically.
 
-**`ensureParentDir`** creates the parent directory with `MkdirAll` if it doesn't exist. This is how `.github/copilot-instructions.md` and `.claude/settings.json` work — subdirectories are created automatically.
+**Adding a new AI tool (structured/JSON/TOML output):** Add its filename to `StructuredTargets`, then add a `<filename>.tmpl` file in `templates/`. Use Go `text/template` syntax.
+
+**`ensureParentDir`** creates the parent directory with `MkdirAll` if it doesn't exist. This is how `.github/`, `.claude/`, `.kiro/`, and `.cursor/rules/` are created automatically.
 
 ---
 
@@ -260,11 +318,11 @@ type TemplateData struct {
 
 Manages `~/.devkit/projects.txt` — one absolute path per line.
 
-**`Append(fsys fs.FS, dataDir, targetPath string) error`**
-Adds `targetPath` to `projects.txt` if not already present.
+**`Append(fsys fs.FS, dataDir, targetPath string) error`**  
+Adds `targetPath` to `projects.txt` if not already present. Creates the file if it doesn't exist.
 
-**`ReadAll(fsys fs.FS, dataDir string) ([]string, error)`**
-Returns all paths. Missing file returns empty slice, not error.
+**`ReadAll(fsys fs.FS, dataDir string) ([]string, error)`**  
+Returns all paths. Missing file returns empty slice (not an error). If the file exists but cannot be read (e.g., permission denied), returns an error.
 
 ---
 
@@ -292,58 +350,134 @@ Each command file registers itself in its `init()` via `rootCmd.AddCommand(...)`
 ### `main.go`
 
 ```go
-func main()     // calls os.Exit(run())
-func run() int  // calls rootCmd.Execute(), returns 0 or 1
+var verbose bool
+
+func main()       // calls os.Exit(run())
+func run() int    // calls rootCmd.Execute(), returns 0 or 1
+func debugf(format string, args ...any)  // prints to os.Stderr when --verbose/-v is set
 ```
 
 `run()` is separate from `main()` so testscript can register it as an in-process binary via `TestMain`. Never call `os.Exit` directly from a command — return an error instead.
+
+`--verbose`/`-v` is a persistent flag on the root command. `debugf` writes to `os.Stderr` directly (not `cmd.ErrOrStderr`) because it's a global, not scoped to a cobra command.
 
 ### `init.go`
 
 Scaffolds `~/.devkit/` from the embedded `templates/` directory.
 
-- Fails if `dataDir` already exists (tells the user to `reset` instead).
+- Fails if `workspace.yaml` already exists in `dataDir` (tells the user to `reset` instead).
 - Uses `fs.WalkDir(TemplateFS, ...)` to copy every embedded file.
 - `TemplateFS` is declared in `main.go` with `//go:embed all:templates`. The `all:` prefix is required to capture dotfiles (`.cursorrules`, etc.).
+- Creates `~/.devkit/` with mode `0700`; files are written with mode `0600`.
+
+### `compose_helper.go`
+
+Not a command — shared infrastructure used by `status`, `doctor`, and `diff`.
+
+**`composedContext` struct:**
+```go
+type composedContext struct {
+    fsys    dkfs.FS
+    dataDir string
+    ws      *config.Workspace
+    result  *composer.Result
+}
+```
+
+**`resolveComposed(includeLessons bool, force bool) (*composedContext, error)`**  
+Runs steps 1–4 of the data flow (DataDir → Load config → Load context → Compose) and returns the result. Calls `debugf` at each step so `--verbose` traces the pipeline.
 
 ### `generate.go`
 
 Drives the full pipeline: `DataDir → Load config → Load context → Compose → Generate`.
 
-Flags: `--dry-run`, `--include-lessons`, `--force`.
+**Flags:** `--dry-run`, `--include-lessons`, `--force`, `--all`, `--quiet`.
 
-`--dry-run` calls `printDryRun` which shows a 20-line preview of `CLAUDE.md` and the file list — it never writes anything.
+- `--dry-run` calls `printDryRun` which shows a 20-line preview of `CLAUDE.md` and the file list — it never writes anything. Cannot be combined with `--all`.
+- `--all` regenerates every path in `projects.txt`. Skips directories that no longer exist (with a warning).
+- `--quiet` suppresses the success output (useful in scripts).
+
+After generating, `generate.go` also:
+- Calls `buildMCPJSON` to write `.mcp.json` if the context frontmatter declares `mcp_servers`.
+- Calls `registry.Append` to record the path in `projects.txt`.
+- Calls `writeSkillsFile` to mirror content to `~/.claude/skills/devkit-context.md` if that directory exists.
+- Calls `checkGitignore` to warn if the target is a git repo without the generated files in `.gitignore`.
 
 ### `reset.go`
 
-Prompts for `yes` confirmation via `bufio.Scanner` on `os.Stdin`, then calls `os.RemoveAll(dataDir)` followed by `runInit`.
+Re-scaffolds `~/.devkit/`. Default (non-destructive): only adds files that don't already exist. `--hard`: deletes all of `~/.devkit/` and re-initializes.
 
-### `search.go`
-
-Calls `config.DataDir()`, then `search.Search()`, then prints `file:line: text` results.
-
-Flags: `--interactive`. When set, pipes results to `fzf` if on PATH, otherwise falls back to `go-fuzzyfinder`.
+Both modes prompt for `yes` confirmation via `bufio.Scanner` on `cmd.InOrStdin()` (not `os.Stdin` — this makes the confirmation testable in testscript).
 
 ### `status.go`
 
-Shows sync state for all tracked projects from `projects.txt`. Compares composed content to `CLAUDE.md` on disk.
-States: `✓ in-sync`, `✗ stale`, `⚠ not generated`, `? missing`.
+`devkit status` — shows sync state for all tracked project paths.
 
-### `diff.go`
+Uses `resolveComposed` to get the current composed content, then compares it byte-for-byte to `CLAUDE.md` in each tracked path.
 
-Shows what `devkit generate` would change for a given path. Flags: `--check` (exit 1 if any files would change, for CI).
-
-### `context.go`
-
-`devkit context ls` — lists contexts in `~/.devkit/contexts/` with size and last-modified date. Marks active context.
+States: `✓ in-sync`, `✗ stale`, `⚠ not generated`, `? missing`.  
+Summary line: `N in-sync, N stale, N missing`.
 
 ### `doctor.go`
 
-`devkit doctor` — mtime-based stale check. Compares mtime of identity/context sources to `CLAUDE.md` in each tracked project.
+`devkit doctor` — mtime-based stale check. Distinct from `status`: instead of comparing file content, it checks whether source files are newer than the generated `CLAUDE.md`.
+
+Uses `resolveComposed` to load config, then:
+1. Finds the latest mtime across `identity/*.md`, the active context file(s), and `donts.md`.
+2. For each tracked project, compares that mtime to `CLAUDE.md`'s mtime.
+
+States: `✓ up-to-date`, `✗ stale`, `⚠ not generated`, `⚠ unreadable`, `? missing`.
+
+### `diff.go`
+
+`devkit diff <path>` — shows what `devkit generate` would change for a given path.
+
+Checks MarkdownTargets, ExtraTargets, MDCTargets (with MDCFrontmatter prepended), and StructuredTargets. For each file: compares current disk content to what would be written.
+
+**Flags:** `--check` — exits with code 1 if any files would change. Useful in CI to enforce that generated files are committed.
 
 ### `lint.go`
 
-`devkit lint` — validates `~/.devkit/` source files. Checks workspace.yaml required fields, active context exists, identity files present, file sizes, unexpanded `${VAR}` patterns, and estimated composed size.
+`devkit lint` — validates `~/.devkit/` source files without generating anything.
+
+Checks:
+1. `workspace.yaml` is valid and has required fields.
+2. Active context exists (as a file or directory).
+3. `identity/` has at least one `.md` file.
+4. Each `.md` file: warns if over 8KB, warns if it contains unexpanded `${VAR}` patterns.
+5. Estimated composed size: warns over 16KB, errors over 32KB.
+
+Exits non-zero if there are any errors (warnings alone do not fail).
+
+### `context.go`
+
+`devkit context ls` — lists all contexts in `~/.devkit/contexts/`.
+
+For each entry: shows name, size, and last-modified date. Folder contexts aggregate size across all `.md` files inside. The active context is marked with `*active*`.
+
+### `sync.go`
+
+`devkit sync` — runs `git pull --rebase` then `git push` on `~/.devkit/`.
+
+Requires `~/.devkit/` to be a git repository. Errors with setup instructions if `.git` is not present.
+
+### `version.go`
+
+`devkit version` — prints `devkit <version>`. The `version` variable is set at build time by goreleaser via `-ldflags "-X main.version=vX.Y.Z"`. Defaults to `"dev"` in local builds.
+
+### `untrack.go`
+
+`devkit untrack <path>` — removes a project path from `projects.txt`.
+
+Resolves the argument to an absolute path, reads `projects.txt`, filters out the matching line, and rewrites the file. Errors if the path is not tracked.
+
+### `search.go`
+
+`devkit search <query>` — searches all markdown files under `~/.devkit/`.
+
+Calls `config.DataDir()`, then `search.Search()`, then prints `file:line: text` results.
+
+**Flags:** `--interactive`. When set, pipes results to `fzf` if on PATH, otherwise falls back to `go-fuzzyfinder`.
 
 ---
 
@@ -421,12 +555,14 @@ All checks run on every push and PR to `main`.
 
 | Job | Command | What it checks |
 |---|---|---|
-| `test` | `go test ./...` | Unit tests + e2e testscript suite |
+| `test` | `go test -coverprofile=coverage.out ./...` | Unit tests + e2e testscript suite |
 | `test` | `CGO_ENABLED=0 go build .` | Binary compiles cleanly |
 | `lint` | `golangci-lint run` v2.12.2 | Style, errcheck, unused vars, etc. |
 | `vuln` | `govulncheck -show verbose ./...` | Known CVEs in deps |
 | `licenses` | `go-licenses check` | Only MIT/Apache/BSD deps allowed |
 | `secrets` | `trufflehog` | No credentials in git history |
+
+The `test` job runs on a matrix of `ubuntu-latest`, `macos-latest`, and `windows-latest`. Coverage is uploaded as a GitHub Actions artifact (from ubuntu only, 7-day retention).
 
 **Weekly jobs** (`deps.yaml`): `govulncheck` + `trivy` filesystem scan.
 
@@ -443,6 +579,8 @@ make check       # all of the above
 make build       # compile binary
 make install     # go install (puts devkit on $PATH)
 ```
+
+`mise.toml` pins Go (`1.26`) and golangci-lint (`2.12.2`) for local dev consistency. Run `mise install` once to get the same versions CI uses.
 
 ---
 
@@ -463,7 +601,7 @@ The testscript framework runs `devkit` in-process — no separate build step. `T
 
 These are non-obvious constraints that must be preserved:
 
-1. **`run()` not `os.Exit()`** — `main.go` uses `os.Exit(run())`. Commands return errors. This is required for testscript in-process execution.
+1. **`run()` not `os.Exit()`** — `main.go` uses `os.Exit(run())`. Commands return errors. Required for testscript in-process execution.
 
 2. **`all:templates` embed prefix** — Without `all:`, dotfiles are silently skipped. Always use `//go:embed all:templates`.
 
@@ -477,7 +615,15 @@ These are non-obvious constraints that must be preserved:
 
 7. **No `os.UserConfigDir()`** — Returns `~/Library/Application Support` on macOS. Always use `os.UserHomeDir() + "/.devkit"` or `$DEVKIT_HOME`.
 
-8. **`ensureParentDir` before WriteFile** — Generator calls this for every target. It's what creates `.github/` for `copilot-instructions.md` and `.claude/` for `settings.json`.
+8. **`ensureParentDir` before WriteFile** — Generator calls this for every target. It creates `.github/`, `.claude/`, `.kiro/`, and `.cursor/rules/` automatically.
+
+9. **Path traversal protection** — `generator.Generate` validates every target path with `filepath.Clean` + `strings.HasPrefix` before writing. This applies to `MarkdownTargets`, `ExtraTargets`, `MDCTargets`, and `StructuredTargets`. `devctx.Load` applies the same check to `active_context`.
+
+10. **File permissions** — `~/.devkit/` is created with mode `0700`. Files inside it are written with mode `0600`. Generated project files (CLAUDE.md, etc.) use `0644`.
+
+11. **`cmd.InOrStdin()` not `os.Stdin`** — `reset.go` reads confirmation input via `cmd.InOrStdin()`. This allows testscript to inject stdin without touching the real terminal.
+
+12. **`debugf` uses `os.Stderr` directly** — The `debugf` helper is global (not scoped to a cobra command), so it writes to `os.Stderr` rather than `cmd.ErrOrStderr()`. This is intentional — it cannot be injected by tests.
 
 ---
 
@@ -491,25 +637,9 @@ These are non-obvious constraints that must be preserved:
 
 ---
 
-## Milestone 2.5 — What's Next
+## What's Next
 
-The design is fully specified in `devkit-workspace-design.md`. Implementation order recommendation:
+Milestones 2.5 and 2.75 are complete. The next planned milestones are:
 
-| Priority | Feature | Why |
-|---|---|---|
-| 1 | `extra_targets` in workspace.yaml | Enables new tool support without a release |
-| 2 | `projects.txt` registry + `--all` | Makes multi-project updates a one-liner |
-| 3 | `devkit context ls` | Quality of life, small scope |
-| 4 | `devkit doctor` | Useful once `--all` exists |
-| 5 | `devkit search --interactive` | Requires go-fuzzyfinder dep |
-| 6 | `devkit sync` | Requires user has a private git repo for `~/.devkit/` |
-| 7 | `.mcp.json` generation | Requires YAML frontmatter parsing in devctx |
-
-New internal packages needed for 2.5:
-- `internal/registry` — read/write `~/.devkit/projects.txt`
-- `internal/mcp` — parse `mcp_servers` frontmatter, render `.mcp.json`
-
-New command files needed:
-- `context.go` — `devkit context ls`
-- `doctor.go` — `devkit doctor`
-- `sync.go` — `devkit sync`
+- **Milestone 3 (archive/backup):** Age-encrypted backup to a configurable recipient. The `backup_recipient` field in `workspace.yaml` is already reserved for this. See `devkit-workspace-design.md` for the full spec.
+- **v2 (MCP server mode):** devkit running as a local MCP server so AI tools can query context directly without file generation. Also specified in `devkit-workspace-design.md`.
