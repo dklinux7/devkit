@@ -3,14 +3,15 @@ package registry
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"strings"
 
-	"github.com/dklinux7/devkit/internal/fs"
+	dkfs "github.com/dklinux7/devkit/internal/fs"
 )
 
 // Append adds targetPath to projects.txt if not already present.
-func Append(fsys fs.FS, dataDir, targetPath string) error {
+func Append(fsys dkfs.FS, dataDir, targetPath string) error {
 	filePath := filepath.Join(dataDir, "projects.txt")
 
 	existing, err := fsys.ReadFile(filePath)
@@ -32,13 +33,15 @@ func Append(fsys fs.FS, dataDir, targetPath string) error {
 }
 
 // ReadAll returns all paths from projects.txt. Missing file returns empty slice, not error.
-func ReadAll(fsys fs.FS, dataDir string) ([]string, error) {
+func ReadAll(fsys dkfs.FS, dataDir string) ([]string, error) {
 	filePath := filepath.Join(dataDir, "projects.txt")
 
 	data, err := fsys.ReadFile(filePath)
 	if err != nil {
-		// File doesn't exist — return empty slice.
-		return []string{}, nil
+		if !fsys.Exists(filePath) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("reading projects.txt: %w", err)
 	}
 
 	var paths []string

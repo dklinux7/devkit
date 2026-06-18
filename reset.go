@@ -37,7 +37,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "This cannot be undone. All identity, context, and findings files will be lost.\n\n")
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Type 'yes' to confirm: ")
 
-		scanner := bufio.NewScanner(os.Stdin)
+		scanner := bufio.NewScanner(cmd.InOrStdin())
 		scanner.Scan()
 		answer := strings.TrimSpace(scanner.Text())
 
@@ -87,7 +87,7 @@ func runReset(cmd *cobra.Command, args []string) error {
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nType 'yes' to confirm: ")
 
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(cmd.InOrStdin())
 	scanner.Scan()
 	answer := strings.TrimSpace(scanner.Text())
 

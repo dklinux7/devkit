@@ -21,11 +21,13 @@ func resolveComposed(includeLessons bool, force bool) (*composedContext, error) 
 	if err != nil {
 		return nil, err
 	}
+	debugf("data dir: %s", dataDir)
 	fsys := dkfs.NewOsFS()
 	ws, err := config.Load(fsys, dataDir)
 	if err != nil {
 		return nil, err
 	}
+	debugf("active context: %s", ws.ActiveContext)
 	sources, err := devctx.Load(fsys, dataDir, ws.ActiveContext, includeLessons)
 	if err != nil {
 		return nil, fmt.Errorf("loading context: %w", err)
@@ -34,5 +36,6 @@ func resolveComposed(includeLessons bool, force bool) (*composedContext, error) 
 	if err != nil {
 		return nil, err
 	}
+	debugf("composed size: %d bytes", result.Size)
 	return &composedContext{fsys: fsys, dataDir: dataDir, ws: ws, result: result}, nil
 }
