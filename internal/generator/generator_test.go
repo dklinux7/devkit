@@ -159,7 +159,9 @@ func TestGenerateNoSliceMutation(t *testing.T) {
 	copy(original, MarkdownTargets)
 
 	fsys := fs.NewMemFS()
-	fsys.MkdirAll("/target", 0755)
+	if err := fsys.MkdirAll("/target", 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	ws := &config.Workspace{
 		Name:          "test",
@@ -167,7 +169,9 @@ func TestGenerateNoSliceMutation(t *testing.T) {
 		ExtraTargets:  []string{"extra1.md", "extra2.md"},
 	}
 
-	Generate(fsys, "/target", "test content", ws, "/templates")
+	if _, err := Generate(fsys, "/target", "test content", ws, "/templates"); err != nil {
+		t.Fatal(err)
+	}
 
 	if !reflect.DeepEqual(MarkdownTargets, original) {
 		t.Errorf("Generate mutated MarkdownTargets: got %v, want %v", MarkdownTargets, original)
@@ -176,7 +180,9 @@ func TestGenerateNoSliceMutation(t *testing.T) {
 
 func TestGenerateRejectsPathTraversal(t *testing.T) {
 	fsys := fs.NewMemFS()
-	fsys.MkdirAll("/target", 0755)
+	if err := fsys.MkdirAll("/target", 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	ws := &config.Workspace{
 		Name:          "test",

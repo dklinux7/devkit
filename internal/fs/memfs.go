@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -24,40 +25,58 @@ func NewMemFS() *MemFS {
 	}
 }
 
-func (m *MemFS) ReadFile(path string) ([]byte, error) {
-	data, ok := m.files[path]
+func normalize(p string) string {
+	return filepath.ToSlash(p)
+}
+
+func (m *MemFS) ReadFile(p string) ([]byte, error) {
+	p = normalize(p)
+	data, ok := m.files[p]
 	if !ok {
-		return nil, fmt.Errorf("open %s: no such file or directory", path)
+		return nil, fmt.Errorf("open %s: no such file or directory", p)
 	}
 	return data, nil
 }
 
-func (m *MemFS) WriteFile(path string, data []byte, perm os.FileMode) error {
-	m.files[path] = append([]byte(nil), data...)
-	m.ModTimes[path] = time.Now()
-	dir := filepath.Dir(path)
-	for dir != "." {
-		next := filepath.Dir(dir)
-		if next == dir {
+func (m *MemFS) WriteFile(p string, data []byte, perm os.FileMode) error {
+	p = normalize(p)
+	m.files[p] = append([]byte(nil), data...)
+	m.ModTimes[p] = time.Now()
+	dir := slashDir(p)
+	for dir != "." && dir != "/" {
+		m.dirs[dir] = true
+		parent := slashDir(dir)
+		if parent == dir {
 			break
 		}
-		m.dirs[dir] = true
-		dir = next
+		dir = parent
 	}
 	return nil
 }
 
-func (m *MemFS) ReadDir(path string) ([]os.DirEntry, error) {
+func slashDir(p string) string {
+	idx := strings.LastIndexByte(p, '/')
+	if idx < 0 {
+		return "."
+	}
+	if idx == 0 {
+		return "/"
+	}
+	return p[:idx]
+}
+
+func (m *MemFS) ReadDir(p string) ([]os.DirEntry, error) {
+	p = normalize(p)
 	var entries []os.DirEntry
 	seen := make(map[string]bool)
 
-	prefix := path + "/"
+	prefix := strings.TrimSuffix(p, "/") + "/"
 
-	for p := range m.files {
-		if !strings.HasPrefix(p, prefix) {
+	for fp := range m.files {
+		if !strings.HasPrefix(fp, prefix) {
 			continue
 		}
-		rel := strings.TrimPrefix(p, prefix)
+		rel := strings.TrimPrefix(fp, prefix)
 		parts := strings.SplitN(rel, "/", 2)
 		name := parts[0]
 		if seen[name] {
@@ -72,8 +91,8 @@ func (m *MemFS) ReadDir(path string) ([]os.DirEntry, error) {
 	}
 
 	for d := range m.dirs {
-		if filepath.Dir(d) == path {
-			name := filepath.Base(d)
+		if slashDir(d) == p {
+			name := d[strings.LastIndexByte(d, '/')+1:]
 			if !seen[name] {
 				seen[name] = true
 				entries = append(entries, &memDirEntry{name: name, isDir: true})
@@ -81,16 +100,16 @@ func (m *MemFS) ReadDir(path string) ([]os.DirEntry, error) {
 		}
 	}
 
-	if len(entries) == 0 && !m.dirs[path] {
+	if len(entries) == 0 && !m.dirs[p] {
 		hasAnyFile := false
-		for p := range m.files {
-			if strings.HasPrefix(p, prefix) {
+		for fp := range m.files {
+			if strings.HasPrefix(fp, prefix) {
 				hasAnyFile = true
 				break
 			}
 		}
 		if !hasAnyFile {
-			return nil, fmt.Errorf("open %s: no such file or directory", path)
+			return nil, fmt.Errorf("open %s: no such file or directory", p)
 		}
 	}
 
@@ -101,50 +120,56 @@ func (m *MemFS) ReadDir(path string) ([]os.DirEntry, error) {
 }
 
 func (m *MemFS) Glob(pattern string) ([]string, error) {
+	pattern = normalize(pattern)
 	var matches []string
-	for p := range m.files {
-		matched, err := filepath.Match(pattern, p)
+	for fp := range m.files {
+		matched, err := path.Match(pattern, fp)
 		if err != nil {
 			return nil, err
 		}
 		if matched {
-			matches = append(matches, p)
+			matches = append(matches, fp)
 		}
 	}
 	sort.Strings(matches)
 	return matches, nil
 }
 
-func (m *MemFS) Exists(path string) bool {
-	if _, ok := m.files[path]; ok {
+func (m *MemFS) Exists(p string) bool {
+	p = normalize(p)
+	if _, ok := m.files[p]; ok {
 		return true
 	}
-	return m.dirs[path]
+	return m.dirs[p]
 }
 
-func (m *MemFS) MkdirAll(path string, perm os.FileMode) error {
-	m.dirs[path] = true
-	dir := filepath.Dir(path)
-	for dir != "." {
-		next := filepath.Dir(dir)
-		if next == dir {
+func (m *MemFS) MkdirAll(p string, perm os.FileMode) error {
+	p = normalize(p)
+	m.dirs[p] = true
+	dir := slashDir(p)
+	for dir != "." && dir != "/" {
+		m.dirs[dir] = true
+		parent := slashDir(dir)
+		if parent == dir {
 			break
 		}
-		m.dirs[dir] = true
-		dir = next
+		dir = parent
 	}
 	return nil
 }
 
-func (m *MemFS) Stat(path string) (os.FileInfo, error) {
-	if data, ok := m.files[path]; ok {
-		mt := m.ModTimes[path]
-		return &memFileInfo{name: filepath.Base(path), size: int64(len(data)), modTime: mt}, nil
+func (m *MemFS) Stat(p string) (os.FileInfo, error) {
+	p = normalize(p)
+	if data, ok := m.files[p]; ok {
+		mt := m.ModTimes[p]
+		name := p[strings.LastIndexByte(p, '/')+1:]
+		return &memFileInfo{name: name, size: int64(len(data)), modTime: mt}, nil
 	}
-	if m.dirs[path] {
-		return &memFileInfo{name: filepath.Base(path), isDir: true}, nil
+	if m.dirs[p] {
+		name := p[strings.LastIndexByte(p, '/')+1:]
+		return &memFileInfo{name: name, isDir: true}, nil
 	}
-	return nil, fmt.Errorf("stat %s: no such file or directory", path)
+	return nil, fmt.Errorf("stat %s: no such file or directory", p)
 }
 
 type memDirEntry struct {

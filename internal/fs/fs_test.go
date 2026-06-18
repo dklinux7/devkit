@@ -146,7 +146,9 @@ func TestMemFSModTime(t *testing.T) {
 	m := NewMemFS()
 
 	before := time.Now()
-	m.WriteFile("/test.md", []byte("hello"), 0600)
+	if err := m.WriteFile("/test.md", []byte("hello"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	after := time.Now()
 
 	info, err := m.Stat("/test.md")
@@ -163,7 +165,9 @@ func TestMemFSModTime(t *testing.T) {
 func TestMemFSCustomModTime(t *testing.T) {
 	m := NewMemFS()
 
-	m.WriteFile("/test.md", []byte("hello"), 0600)
+	if err := m.WriteFile("/test.md", []byte("hello"), 0600); err != nil {
+		t.Fatal(err)
+	}
 
 	past := time.Now().Add(-1 * time.Hour)
 	m.ModTimes["/test.md"] = past
