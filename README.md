@@ -1,6 +1,6 @@
 # devkit
 
-Personal dev workspace generator. Composes your identity, constraints, and company context into AI config files for any coding tool.
+Personal dev workspace generator. Composes your identity, constraints, and project context into AI config files for any coding tool.
 
 ## Install
 
