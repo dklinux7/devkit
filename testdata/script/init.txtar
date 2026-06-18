@@ -1,0 +1,13 @@
+# init creates ~/.devkit/ scaffold in a fresh directory
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+stdout '✓ Created'
+stdout 'Next steps'
+
+exists $WORK/devkit-home/workspace.yaml
+exists $WORK/devkit-home/identity/ai.md
+exists $WORK/devkit-home/identity/engineering.md
+exists $WORK/devkit-home/donts.md
+exists $WORK/devkit-home/contexts/work.md
+exists $WORK/devkit-home/tools.md

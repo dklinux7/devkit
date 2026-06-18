@@ -1,0 +1,7 @@
+# search prints a clear message when no matches are found
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+exec devkit search xyzzy-no-match-sentinel
+stdout 'No matches'
+! stdout ':'

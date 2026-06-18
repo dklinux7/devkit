@@ -23,8 +23,13 @@ One source of truth → every AI tool gets the same context.`,
 }
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	if err := rootCmd.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

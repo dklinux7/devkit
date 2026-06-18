@@ -1,0 +1,7 @@
+# search finds matching lines across all markdown files
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+exec devkit search concise
+stdout 'concise'
+stdout '[0-9]+'

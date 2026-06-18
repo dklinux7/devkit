@@ -1,0 +1,16 @@
+# generate --dry-run shows a preview without writing any files
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+exec devkit generate --dry-run $WORK/project
+stdout 'Would generate 5 files'
+stdout 'CLAUDE.md'
+
+! exists $WORK/project/CLAUDE.md
+! exists $WORK/project/AGENTS.md
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

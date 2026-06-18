@@ -1,0 +1,6 @@
+# generate fails clearly when DEVKIT_HOME has not been initialised
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+! exec devkit generate $WORK/project
+stderr 'workspace.yaml'

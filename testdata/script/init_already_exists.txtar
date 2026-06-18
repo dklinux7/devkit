@@ -1,0 +1,6 @@
+# init fails with a clear error when DEVKIT_HOME already exists
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+! exec devkit init
+stderr 'already exists'

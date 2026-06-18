@@ -1,0 +1,19 @@
+# reset with 'yes' deletes and re-initialises DEVKIT_HOME
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+
+stdin $WORK/yes.txt
+exec devkit reset
+stdout '✓ Created'
+
+exists $WORK/devkit-home/workspace.yaml
+exists $WORK/devkit-home/identity/ai.md
+
+-- yes.txt --
+yes
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work

@@ -1,0 +1,14 @@
+# reset with anything other than 'yes' aborts and leaves DEVKIT_HOME intact
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+
+stdin $WORK/no.txt
+exec devkit reset
+stdout 'Aborted'
+! stdout '✓ Created'
+
+exists $WORK/devkit-home/workspace.yaml
+
+-- no.txt --
+no

@@ -1,0 +1,6 @@
+# search is case-insensitive
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+exec devkit search CONCISE
+stdout 'concise'

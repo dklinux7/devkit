@@ -1,0 +1,25 @@
+# generate reports overwritten files when content changes
+env DEVKIT_HOME=$WORK/devkit-home
+mkdir $WORK/project
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+
+# first generate — writes fresh files
+exec devkit generate $WORK/project
+
+# modify context so second generate produces different content
+cp $WORK/contexts_work.md $WORK/devkit-home/contexts/work.md
+
+# second generate — should report overwrite on stderr
+exec devkit generate $WORK/project
+stderr 'Overwriting'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work
+
+-- contexts_work.md --
+# Work Context
+
+Updated company context for overwrite test.

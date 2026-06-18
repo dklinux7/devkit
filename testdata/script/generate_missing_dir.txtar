@@ -1,0 +1,11 @@
+# generate fails clearly when target directory does not exist
+env DEVKIT_HOME=$WORK/devkit-home
+
+exec devkit init
+cp $WORK/workspace.yaml $WORK/devkit-home/workspace.yaml
+! exec devkit generate $WORK/no-such-dir
+stderr 'does not exist'
+
+-- workspace.yaml --
+name: "Test User"
+active_context: work
