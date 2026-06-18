@@ -13,9 +13,10 @@ import (
 var MarkdownTargets = []string{
 	"CLAUDE.md",
 	"AGENTS.md",
+	"GEMINI.md",
 	".cursorrules",
 	".windsurfrules",
-	"copilot-instructions.md",
+	".github/copilot-instructions.md",
 }
 
 var StructuredTargets = []string{
