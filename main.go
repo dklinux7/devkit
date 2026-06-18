@@ -1,11 +1,15 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
+
+//go:embed all:templates
+var TemplateFS embed.FS
 
 var rootCmd = &cobra.Command{
 	Use:   "devkit",

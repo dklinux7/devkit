@@ -1,7 +1,7 @@
 .PHONY: build test lint check update clean install
 
 BINARY := devkit
-CMD := ./cmd/devkit
+CMD := .
 
 build:
 	CGO_ENABLED=0 go build -o $(BINARY) $(CMD)

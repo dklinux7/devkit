@@ -5,7 +5,7 @@ Personal dev workspace generator. Composes your identity, constraints, and compa
 ## Install
 
 ```sh
-go install github.com/dklinux7/devkit/cmd/devkit@latest
+go install github.com/dklinux7/devkit@latest
 ```
 
 ## Usage

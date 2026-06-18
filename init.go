@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	devkit "github.com/dklinux7/devkit"
 	"github.com/dklinux7/devkit/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +34,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating %s: %w", dataDir, err)
 	}
 
-	err = fs.WalkDir(devkit.TemplateFS, "templates", func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(TemplateFS, "templates", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -47,7 +46,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return os.MkdirAll(target, 0755)
 		}
 
-		data, err := devkit.TemplateFS.ReadFile(path)
+		data, err := TemplateFS.ReadFile(path)
 		if err != nil {
 			return err
 		}

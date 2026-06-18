@@ -6,7 +6,7 @@ before:
 
 builds:
   - id: devkit
-    main: ./cmd/devkit
+    main: .
     binary: devkit
     env:
       - CGO_ENABLED=0
