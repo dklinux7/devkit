@@ -95,6 +95,6 @@ jobs:
           fetch-depth: 0
 
       - name: trufflehog
-        uses: trufflesecurity/trufflehog@d73edfb85d79432e3c767c407afdee59c9a34fde  # v3.88.1
+        uses: trufflesecurity/trufflehog@30d5bb91af1a771378349dbbb0c82129392acf70  # v3.95.6
         with:
           extra_args: --results=verified,unknown
